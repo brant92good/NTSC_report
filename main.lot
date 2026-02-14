@@ -1,0 +1,13 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces 5 分制平均意見分數 (MOS) 評估\cite {wang2017tacotron}\relax }}{6}{figure.caption.12}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Tacotron 超參數與網路架構\cite {wang2017tacotron}\relax }}{6}{figure.caption.12}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces 以相似度平均意見分數 (SMOS) 評估之語者相似度（95\% 信賴區間）\cite {zhou2025indextts2}\relax }}{10}{table.2.3}%
+\contentsline {table}{\numberline {2.4}{\ignorespaces IndexTTS2 與其他基準模型在 LibriSpeech test-clean 資料集上的效能比較\cite {zhou2025indextts2}\relax }}{13}{table.2.4}%
+\contentsline {table}{\numberline {2.5}{\ignorespaces 不同架構之性能與參數比較表。SpeechPrompt 的參數計算基於 Prompt Length $L=5$。\relax }}{26}{table.2.5}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces 實驗資料集統計概覽\relax }}{30}{table.3.1}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsfinish 

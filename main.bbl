@@ -1,0 +1,103 @@
+\begin{thebibliography}{10}
+
+\bibitem{casanova2024xtts}
+Edresson Casanova, Kelly Davis, Eren Gölge, Görkem Göknar, Iulian Gulea,
+  Logan Hart, Aya Aljafari, Joshua Meyer, Reuben Morais, Samuel Olayemi, and
+  Julian Weber.
+\newblock {XTTS: a Massively Multilingual Zero-Shot Text-to-Speech Model}.
+\newblock In {\em {Interspeech 2024}}, pages 4978--4982, 2024.
+
+\bibitem{chen2021adaspeech}
+Mingjian Chen, Xu~Tan, Bohan Li, Yanqing Liu, Tao Qin, sheng zhao, and Tie-Yan
+  Liu.
+\newblock Adaspeech: Adaptive text to speech for custom voice.
+\newblock In {\em International Conference on Learning Representations}, 2021.
+
+\bibitem{chen2024f5tts}
+Yushen Chen, Zhikang Niu, Ziyang Ma, Keqi Deng, Chunhui Wang, Jian Zhao, Kai
+  Yu, and Xie Chen.
+\newblock F5-tts: A fairytaler that fakes fluent and faithful speech with flow
+  matching, 2024.
+
+\bibitem{chung2014empirical}
+Junyoung Chung, Çaglar G{\"u}lçehre, Kyunghyun Cho, and Yoshua Bengio.
+\newblock Empirical evaluation of gated recurrent neural networks on sequence
+  modeling.
+\newblock {\em ArXiv}, abs/1412.3555, 2014.
+
+\bibitem{finn2017maml}
+Chelsea Finn, Pieter Abbeel, and Sergey Levine.
+\newblock Model-agnostic meta-learning for fast adaptation of deep networks.
+\newblock In Doina Precup and Yee~Whye Teh, editors, {\em Proceedings of the
+  34th International Conference on Machine Learning}, volume~70 of {\em
+  Proceedings of Machine Learning Research}, pages 1126--1135. PMLR, 06--11 Aug
+  2017.
+
+\bibitem{yaroslav2016GRL}
+Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo
+  Larochelle, Fran{\c{c}}ois Laviolette, Mario March, and Victor Lempitsky.
+\newblock Domain-adversarial training of neural networks.
+\newblock {\em Journal of Machine Learning Research}, 17(59):1--35, 2016.
+
+\bibitem{gonzalvo2016recent}
+Xavi Gonzalvo, Siamak Tazari, Chun an~Chan, Markus Becker, Alexander Gutkin,
+  and Hanna Silen.
+\newblock Recent advances in google real-time hmm-driven unit selection
+  synthesizer.
+\newblock In {\em Interspeech 2016}, pages 2238--2242, 2016.
+
+\bibitem{huang2022metatts}
+Sung-Feng Huang, Chyi-Jiunn Lin, Da-Rong Liu, Yi-Chen Chen, and Hung-yi Lee.
+\newblock Meta-tts: Meta-learning for few-shot speaker adaptive text-to-speech.
+\newblock {\em IEEE/ACM Transactions on Audio, Speech, and Language
+  Processing}, 30:1558--1571, 2022.
+
+\bibitem{leng2024fishspeech}
+Shuang Leng, Yue Chen, Zhaozheng Liu, Jiaqi Li, Zhuhong Yuan, Rongye Zhang,
+  Kaitao He, Xinfu Guo, Feijuan Chen, Xianghao Song, et~al.
+\newblock Fish-speech: Leveraging large language models for advanced
+  multilingual text-to-speech synthesis, 2024.
+
+\bibitem{Raghu2020anil}
+Aniruddh Raghu, Maithra Raghu, Samy Bengio, and Oriol Vinyals.
+\newblock Rapid learning or feature reuse? towards understanding the
+  effectiveness of maml.
+\newblock In {\em International Conference on Learning Representations}, 2020.
+
+\bibitem{ren2021fastspeech}
+Yi~Ren, Chenxu Hu, Xu~Tan, Tao Qin, Sheng Zhao, Zhou Zhao, and Tie-Yan Liu.
+\newblock Fastspeech 2: Fast and high-quality end-to-end text to speech.
+\newblock In {\em International Conference on Learning Representations}, 2021.
+
+\bibitem{srivastava2015highway}
+Rupesh~Kumar Srivastava, Klaus Greff, and J{\"u}rgen Schmidhuber.
+\newblock Highway networks.
+\newblock {\em ArXiv}, abs/1505.00387, 2015.
+
+\bibitem{sutskever2014seq2seq}
+Ilya Sutskever, Oriol Vinyals, and Quoc~V Le.
+\newblock Sequence to sequence learning with neural networks.
+\newblock In {\em Advances in Neural Information Processing Systems (NeurIPS)},
+  pages 3104--3112, 2014.
+
+\bibitem{wang2017tacotron}
+Yuxuan Wang, R.J. Skerry-Ryan, Daisy Stanton, Yonghui Wu, Ron~J. Weiss, Navdeep
+  Jaitly, Zongheng Yang, Ying Xiao, Zhifeng Chen, Samy Bengio, Quoc Le, Yannis
+  Agiomyrgiannakis, Rob Clark, and Rif~A. Saurous.
+\newblock Tacotron: Towards end-to-end speech synthesis.
+\newblock In {\em Interspeech 2017}, pages 4006--4010, 2017.
+
+\bibitem{zen2016fast}
+Heiga Zen, Yannis Agiomyrgiannakis, Niels Egberts, Fergus Henderson, and
+  Przemys{\l}aw Szczepaniak.
+\newblock Fast, compact, and high quality lstm-rnn based statistical parametric
+  speech synthesizers for mobile devices.
+\newblock In {\em Proc. Interspeech}, pages 662--666, 2016.
+
+\bibitem{zhou2025indextts2}
+Siyi Zhou, Yiquan Zhou, Yi~He, Xun Zhou, Jinchao Wang, Wei Deng, and Jingchen
+  Shu.
+\newblock Indextts2: A breakthrough in emotionally expressive and
+  duration-controlled auto-regressive zero-shot text-to-speech, 2025.
+
+\end{thebibliography}

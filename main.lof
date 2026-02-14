@@ -1,0 +1,19 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Tacotron 模型架構圖\cite {wang2017tacotron}\relax }}{6}{figure.caption.12}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces Meta-TTS 訓練 MAML 流程圖\cite {huang2022metatts}\relax }}{9}{figure.caption.13}%
+\contentsline {figure}{\numberline {2.3}{\ignorespaces 不同適應步驟下的餘弦相似度矩陣\cite {huang2022metatts}\relax }}{10}{figure.caption.14}%
+\contentsline {figure}{\numberline {2.4}{\ignorespaces IndexTTS2 模型架構圖\cite {zhou2025indextts2}\relax }}{11}{figure.caption.15}%
+\contentsline {figure}{\numberline {2.5}{\ignorespaces IndexTTS2 T2S 模塊架構圖\cite {zhou2025indextts2}\relax }}{11}{figure.caption.16}%
+\contentsline {figure}{\numberline {2.6}{\ignorespaces IndexTTS2 S2M 模塊架構圖\cite {zhou2025indextts2}\relax }}{12}{figure.caption.17}%
+\contentsline {figure}{\numberline {2.7}{\ignorespaces AASIST 模型架構圖\relax }}{14}{figure.caption.18}%
+\contentsline {figure}{\numberline {2.8}{\ignorespaces MFA-Conformer 模型架構圖\relax }}{16}{figure.caption.19}%
+\contentsline {figure}{\numberline {2.9}{\ignorespaces GSLM 架構圖\relax }}{19}{figure.caption.20}%
+\contentsline {figure}{\numberline {2.10}{\ignorespaces SpeechPrompt 模型架構圖\relax }}{21}{figure.caption.21}%
+\contentsline {figure}{\numberline {2.11}{\ignorespaces SpeechPrompt 在各式分類任務上的表現\relax }}{25}{figure.caption.22}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Caption\relax }}{31}{figure.caption.23}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsfinish 
