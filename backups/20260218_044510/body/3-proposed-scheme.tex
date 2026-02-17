@@ -1,0 +1,123 @@
+\section{實驗資料集}
+\label{sec:dataset}
+
+為了全面評估模型效能，本實驗採用了以下三個主要的資料集：
+
+\begin{enumerate} \item \textbf{ASVspoof 系列資料集}： 
+
+ASVspoof (Automatic Speaker Verification Spoofing and Countermeasures Challenge) 為該領域公認的權威基準。本研究整合了 2019 年與 2021 年的任務場景，以評估模型在傳統攻擊與現代通訊變異下的表現：
+    
+    \begin{itemize}
+        \item \textbf{ASVspoof 2019 Logical Access (LA)}：作為模型訓練的核心基準，該資料集模擬偽造語音透過通訊系統直接注入的情境。其語料源於 VCTK 資料庫，涵蓋由 17 種文字轉語音 (TTS) 與語音轉換 (VC) 演算法生成的樣本，包含神經聲學模型（如 WaveNet）生成的偽造特徵。
+        
+        \item \textbf{ASVspoof 2021 Logical Access (LA)}：延續 2019 LA 的語料基礎，但進一步引入真實電信網路（VoIP 與 PSTN）傳輸所產生的通道損耗。其經過 A-law、G.722 與 $\mu$-law 等七種不同編解碼器處理，旨在測試模型對於通訊系統所產生的假影（Artifacts）之強健性。
+        
+        \item \textbf{ASVspoof 2021 DeepFake (DF)}：專注於社群媒體與網路傳播場景，偽造樣本由超過 100 種欺騙演算法生成。此子集引入了大量有損壓縮（Lossy compression）處理，包含不同位元速率下的 mp3、m4a 與 ogg 格式，總時數約 454.4 小時，是目前對壓縮抗性要求最高的場景。
+    \end{itemize}
+
+\item \textbf{MLAAD (Multilingual Audio Anti-Spoofing Dataset)}：
+
+MLAAD 是一個包含 23 種多語言的大型偽造語音資料集，第二版長度達 160.2 小時，而第八版則達 570.3 小時，所有音訊均以 22.05 kHz 格式輸出。其攻擊樣本生成基於 M-AILABS 語音庫中的真實語音，利用 52 種先進文字轉語音（TTS）模型與 19 種不同架構（如 VITS、FastSpeech 等）製作，生成來源廣泛涵蓋 [Coqui.ai](http://coqui.ai/) 與 Hugging Face 等開源平台。由於 MLAAD 本身僅包含偽造語音 (Spoof only) 樣本，無法單獨用於訓練二元分類器。因此，在訓練階段，我們參考論文作者建議，將其與此資料集基於的上游全真音訊資料集 \textbf{M-AILABS} 進行混合，以構建完整訓練數據。而在測試階段，我們關注模型對該資料集中偽造語音的檢出率。
+
+\item \textbf{InTheWild (ITW)}：
+
+為了評估模型在實驗室外的泛化能力，本實驗為此採用 InTheWild 資料集作為獨立的跨資料集測試使用。此資料集專門收集自公開的網路來源，用以彌補 ASVspoof 2019 僅基於 VCTK 錄音室語料庫所帶來的局限性。ITW 資料集總長 37.9 小時，精選了 58 位英語名人與政治人物的語音剪輯。其內容被劃分為 17.2 小時的偽造 (fake) 音訊與 20.7 小時的真實 (real) 音訊。偽造音訊是從 219 個公開可用的影片與音訊檔案中分割建構。所有音訊經標準化處理並轉換為 16 kHz 取樣率，平均片段長度約 4.3 秒，整體語料真偽比例維持{\color{red}相較平衡(37.18\%)}。
+
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{實驗資料集統計概覽}
+\label{tab:dataset_stats}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Name}  & \textbf{Languages} & \textbf{Systems} & \textbf{Utterances} & \textbf{Avg. Dur.} & \textbf{Total Dur.} & \textbf{Spoof Utterances Ratio} \\ \hline
+ASVspoof19 LA & English &  19  & 121,461 & 3.25s & 109.7hr  & 89.72\%  \\
+ASVspoof21 LA & English &  13  & 164,612 & 2.72s & 111.8hr  & 90.00\%  \\
+ASVspoof21 DF & English & 100+ & 593,253 & 3.06s & 454.4hr  & 97.21\%  \\
+In-The-Wild   & English &   ?  &  31,779 & 4.29s &  37.9hr  & 37.18\%  \\
+M-AILABS      & 8       &   0  & 493,658 & 7.23s & 991.1hr  &  0.00\%  \\
+MLAAD v2      & 23      &  52  &  72,000 & 7.79s & 160.2hr  & 100.00\% \\
+MLAAD v8      & 40      & 119  & 243,000 & 8.45s & 570.3hr  & 100.00\% \\ \hline
+\end{tabular}
+} %
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{images/dataset_duration.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\clearpage
+
+\section{模型配置與參數設定}
+\label{sec:model_description}
+
+\subsection{硬體環境與實驗控制} 
+所有的實驗均在單張 \textbf{NVIDIA RTX 3090 (24GB VRAM)} 顯卡上進行。為了消除不同模型原始實作中因浮點數精度差異可能帶來的效能影響，並優化記憶體使用效率，本研究對實驗環境進行了以下兩項關鍵的標準化控制：
+
+\begin{enumerate} \item \textbf{統一精度 (Unified Precision)}： 儘管 W2V-AASIST 與 MFA-Conformer 的原始實作採用 FP32 精度，本研究將所有實驗模型的運算精度統一設定為 \textbf{bfloat16}。此舉不僅確保了模型間比較的公平性，更大幅降低了大型模型 (如 SSL-AASIST) 的記憶體佔用，使得我們能夠在單卡環境下使用更大的 Batch Size 進行更穩定的訓練。
+
+\item \textbf{統一損失函數 (Unified Loss Function)}：
+為了應對訓練資料中真實與偽造語音可能存在的數量不平衡問題，我們摒棄了 SpeechPrompt 與 MFA-Conformer 原本使用的標準交叉熵 (CE)，將所有模型的損失函數統一固定為 \textbf{加權交叉熵 (Weighted Cross Entropy, WCE)}。這與 W2V-AASIST 的原始設定保持一致，確保所有模型在相同的優化目標下進行學習。
+
+\end{enumerate}
+
+\subsection{模型實作細節}
+
+\subsubsection{SSL-AASIST (W2V-AASIST)} 該模型以原始波形 (Raw Waveform) 作為輸入。由於其前端依賴參數高達 3 億的 wav2vec 2.0 XLSR 模型，為了適應單卡 3090 的記憶體限制並保持訓練穩定性，我們利用 bfloat16 帶來的空間優勢，將 Batch Size 從原始文獻的 14 提升至 40。根據線性縮放原則，我們相應地調整了學習率，將 Adam 優化器的 Learning Rate 從 10−6 調整至 5×10−6。輸入長度 (Context Window) 固定為 4 秒。
+
+\subsubsection{MFA-Conformer} 本研究復現了基於 Conformer 的架構，該模型以 \textbf{80 維梅爾頻譜圖 (Mel-spectrogram)} 作為輸入特徵。實驗中使用 NVIDIA NeMo 提供的預訓練權重 \texttt{stt\_en\_conformer\_ctc\_small} 進行初始化，其餘超參數與參考文獻保持一致：模型輸入長度設定為 5 秒，Batch Size 設定為 64。優化器採用 Adam，並搭配 Cosine Annealing 排程器 (Scheduler)，包含 Warmup 階段，最高學習率設定為 10−3。
+
+\subsubsection{SpeechPrompt v2} SpeechPrompt 架構採用離散單元 (Discrete Tokens) 作為輸入。由於離散化後的特徵序列長度大幅縮減，除 MLAAD 資料集中極少數超過 100 秒的異常樣本外，模型可將完整的語音長度納入 Context Window 中，無需進行截斷。實驗採用 \texttt{fairseq} 框架進行訓練，由於該框架專為自然語言任務設定特性，會自動根據不同輸入長度動態調整Batch Size 以盡可能貼近指定的max token數量，用以穩定訓練階段的VRAM占用，我們採用原始論問的參數進行訓練。
+在 Prompt 設定方面，我們依據文獻建議 ，啟用 \textbf{Deep Prompt} 機制，並將 Prompt Length 設定為 5。優化器學習率設定為 5×10−3，由於prompt tuning過程的收斂速度極快，原始論文作法設定 Early Stopping 的 Patience 為 1。
+
+\vspace{1em}
+\noindent\textbf{SpeechPrompt 訓練優勢與參數效率分析}
+
+儘管 SpeechPrompt 在偵測準確度上未能超越 SOTA 模型，但本計畫的核心目標之一在於探索「參數效率 (Parameter-Efficient)」的解決方案。
+\textbf{在可訓練參數量方面}，W2V-AASIST 為了達到最佳性能，必須對前端 Wav2Vec 2.0 (XLSR) 進行全參數微調，總可訓練參數量高達 \textbf{317M}。MFA-Conformer (Small) 雖然較為輕量，但仍需訓練約 \textbf{14.6M} 個參數。相比之下，SpeechPrompt 採用 Prompt Tuning 機制，凍結了龐大的 GSLM 骨幹，僅需訓練 Input Prompts、Deep Prompts 與 Verbalizer。在 Prompt Length X=5 的設定下，其可訓練參數僅為 \textbf{129,640 (約 0.13M)}。這意味著 SpeechPrompt 的參數量僅為 W2V-AASIST 的 \textbf{0.04\%}，極大程度地降低了模型儲存與部署的門檻。
+
+\textbf{在訓練時間成本方面}，三者呈現了巨大的差異。(1) \textbf{W2V-AASIST}：由於模型龐大且需處理 Raw Waveform，計算負擔極重。在設定 100 Epoch (針對超大型 MLAAD 資料集調整為 30 Epoch) 的情況下，完整訓練一次需耗時 \textbf{24 至 36 小時}。(2) \textbf{MFA-Conformer}：得益於頻譜特徵的維度縮減，其訓練速度較快。在固定 50 Epoch 的設定下，完整訓練約需 \textbf{2 小時}。(3) \textbf{SpeechPrompt v2}：展現了極致的訓練速度。由於輸入為預先計算好的離散 Token，且需更新的參數極少，模型收斂極快。實驗顯示，其完整訓練過程僅需約 \textbf{300 秒 (5 分鐘)}。綜上所述，SpeechPrompt 展現了以「5 分鐘對比 36 小時」的訓練效率優勢。
+
+\section{主要大實驗 Model Performance}
+\label{sec:model_performance}
+
+\textbf{評估指標}：針對不同的測試情境，本研究採用兩種主要指標。
+\begin{itemize} 
+    \item \textbf{等錯誤率 (Equal Error Rate, EER)}： 適用於 ASVspoof 與 InTheWild 等包含正負樣本的完整測試集。EER 為錯誤接受率 (FAR) 與錯誤拒絕率 (FRR) 相等時的數值，數值越低代表性能越好。
+    \item \textbf{偵測準確率 (Detection Accuracy, ACC)}：由於MLAAD資料集全數為偽造語音，無法計算EER，故我們計算模型成功將樣本判定為「Spoof」的比例作為準確率指標。
+\end{itemize}
+
+本節將對比不同模型架構在各測試集上的表現，實驗結果如表 3.1 所示（註：此處指實驗結果總表）。值得注意的是，為了釐清資料增強（Data Augmentation, DA）對不同架構的影響，我們僅對 \textbf{W2V-AASIST} 採用了其原始論文推薦的 \textbf{Rawboost} 增強策略，而其餘兩模型則未施加額外的資料增強。這是因為我們在預實驗中發現 \textbf{SpeechPrompt} 與 \textbf{MFA-Conformer} 在引入 DA 後並無顯著的性能提升，推測與輸入特徵的屬性（頻譜提取與離散化過程的濾波效應）有關。
+
+\textbf{基準測試與訊號層級特徵的重要性}：在標準的 ASVspoof 2019 LA 與 2021 LA 測試中，基於 Wav2Vec 2.0 前端的 \textbf{W2V-AASIST} 展現了壓倒性的優勢，分別取得了 0.27\% 與 0.87\% 的極低 EER。這證實了在面對邏輯存取（Logical Access）攻擊時，模型對於原始波形（Raw Waveform）中細微頻譜特徵與相位資訊的捕捉能力至關重要。相比之下，\textbf{SpeechPrompt v2} 在 ASV19 LA 上的 EER 高達 13.5\%，與 SOTA 模型存在顯著差距。
+
+\textbf{真實場景下的泛化能力}：在面對真實世界數據 \textbf{InTheWild (ITW)} 時，W2V-AASIST 雖然性能有所下降（13.30\% EER），但仍保持了一定的偵測能力，顯示出其對於通道變異具有一定的魯棒性。然而，SpeechPrompt 在 ITW 上表現出了極度的不適應，EER 高達 67.11\%，這基本上意味著模型在真實場景下完全失效。這一結果顯示缺乏底層聲學細節支撐的語意特徵並不足以應對深偽偵測任務。
+
+\textbf{MLAAD 資料集的極端反差}：實驗中最引人注目的異常現象在於 MLAAD 資料集的結果。W2V-AASIST 在全語言版本（MLAAD FULL）上的準確率僅為 53.09\%，接近隨機猜測，這可能歸因於模型對未見過的語言或特定的生成方法產生了嚴重的域偏移（Domain Shift）。相反地，在其他資料集表現不佳的 SpeechPrompt，卻在 MLAAD 上取得了驚人的 99.65\% 準確率。考慮到該模型在 ITW 與 ASV 基準上的低落表現，我們推測這並非源於模型真正的泛化能力，而是模型可能過度擬合（Overfitting）了 MLAAD 資料集生成過程中特定的、非一般化的特徵（如特定的靜音模式或 Codec 殘留）。
+
+\textbf{MFA-Conformer 表現}：(實驗數據待補，此部分先留空，將展示 MFA-Conformer 在各測試集上的基礎性能，並與上述兩模型進行對比)。
+
+\section{Discussion/Analysis}
+\label{sec:discussion}
+
+本節針對上述主要實驗中觀察到的現象與模型特性進行深入的消融實驗與分析。
+
+\textbf{次要實驗 1：Prompt Tuning 與 Full Fine-Tuning 之比較}。
+為了釐清 SpeechPrompt 性能受限的主因，究竟是源於 Prompt Tuning 方法本身的表達能力不足，還是 GSLM 預訓練模型本身就不具備深偽偵測所需的聲學特徵，我們進行了全模型微調 (Full Fine-tuning) 實驗。實驗結果顯示，即便是全參數微調，GSLM 架構在 ASVspoof 19 LA 上的 EER 僅能達到 17.23\%，與僅訓練 Prompt 的 19.05\% 相比，差異並不明顯。這項結果帶來了兩個關鍵洞察：(1) \textbf{Prompting 的參數效率極高}，僅需訓練極少量的參數即可達到接近全模型微調 90\% 以上的效能；(2) \textbf{瓶頸在於前端特徵}，全模型微調未能帶來突破性的性能提升，暗示了問題的根源並非後端語言模型的學習能力，而是前端 S2u (Speech-to-unit) 階段的離散化過程造成了不可逆的聲學特徵流失。
+
+\textbf{次要實驗 2：軟性離散特徵輸入 (Soft Discrete Features)}。
+為了驗證「離散化導致特徵流失」的假設，並嘗試在不改變模型主體架構的前提下找回遺失的聲學細節，我們提出了一種軟性離散特徵的輸入機制。在原始的 SpeechPrompt 中，HuBERT 輸出的連續特徵會被硬性分配給最接近的中心點。本實驗中，我們改為計算特徵與中心點的相似度分數，並以此分數作為權重，將中心點的 Embedding 進行加權求和作為模型的輸入。我們預期透過這種方式，能在一定程度上保留原始音訊在特徵空間中的相對位置資訊，從而補償量化損失。
+
+\textbf{次要實驗 3：MFA-Conformer 預訓練模型規模之影響}。
+MFA-Conformer (Small) 在 ASV21 DeepFake (DF) 任務上與 W2V-AASIST 存在顯著落差（EER 15.00\% vs 5.57\%）。為了假設這是否源於模型容量不足，我們將前端替換為更大型的 \texttt{Conformer-Medium} 與 \texttt{Conformer-Large}。實驗結果顯示，即便將模型規模大幅提升，在 DF 測試集上的 EER 並未出現顯著下降，性能呈現飽和狀態。這暗示了單純增加模型參數並無法解決該架構在跨域偵測上的瓶頸。
+
+\textbf{次要實驗 4：MFA-Conformer 後端分類器之改良}。
+我們推測 MFA 原始架構中簡單的統計池化與線性分類器可能過於簡化，因此嘗試將 MFA-Conformer 的後端替換為 AASIST 架構。然而，實驗結果表明，即使引入了更強大的後端架構，MFA-Conformer 在 DF 任務上與 W2V-AASIST 的差距依然存在。
+
+\textbf{綜合討論與小結}：
+綜合上述實驗，MFA-Conformer 與 W2V-AASIST 在 ASV19/21 LA 上的性能差距較小，顯示 Mel-spectrogram 在邏輯存取攻擊下仍具備足夠解析力。但在 DF 任務上的巨大差距，我們歸因於 \textbf{前端預訓練範式的本質差異}：MFA-Conformer 初始化自 ASR 監督式模型，傾向於學習對噪音具有「不變性」的特徵，從而過濾掉非語言的偽造痕跡；而 W2V-AASIST 基於 SSL 自監督學習，其重建訊號的目標迫使模型保留了豐富的底層聲學細節（包含相位、通道響應等）。這使得 SSL 預訓練模型在面對未知攻擊與複雜通道時，具備更強的泛化與判別能力。
