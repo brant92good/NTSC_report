@@ -1,0 +1,201 @@
+\section{語音合成技術}
+目前在語音合成技術中最普遍的應用為文字轉語音（TTS, Text to Speech），其流程為輸入一段文本序列並產出相應的語音訊號。TTS 領域包含多種技術手段，從早期的單一語者端對端架構，發展至整合遷移學習（Transfer Learning）的多語者模型。近期研究則逐漸轉向以大型語言模型（LLM, Large Language Model）驅動的架構，利用海量通用語音數據提升生成效能，並根據生成機制分為逐記號產生的自回歸（AR, Auto-Regressive）與並行預測的非自回歸（non Auto-Regressive）系統。
+
+在語音合成技術的演進過程中，傳統的統計參數語音合成管道極為複雜，通常包含文本分析前端、時長模型、聲學特徵預測模型以及基於信號處理的聲碼器等複數階段 \cite{zen2016fast}。由於各個元件需依賴大量的領域專業知識進行獨立設計與訓練，各階段產生的預測錯誤往往會不斷累積，導致最終合成音訊的自然度受限且工程開發成本高昂。為了解決上述多階段系統的侷限性，端對端（End-to-End）生成模型架構（如 Tacotron \cite{wang2017tacotron}）應運而生。該類模型具備從字元序列直接映射至原始頻譜圖的能力，僅需透過「文本－音訊」對即可從頭開始進行訓練，無需人工預先標註音素等級的對齊資訊。
+
+為了提升個人化語音合成（亦稱語音複製 Voice Cloning）的實用性，利用少數的樣本來生成高品質的目標聲音已成為目標。針對此需求，學界引入了遷移學習（Transfer Learning）的技術框架。在語音領域，遷移學習通常先在大型語音數據集上訓練一個預訓練模型，隨後將此模型的知識應用於目標任務中。目前在遷移學習的架構下，構建個人化語音系統主要有兩大路徑，分別透過不同的方式處理預訓練模型的知識遷移：語者自適應（Speaker Adaptation{\color{red} \cite{chen2021adaspeech, huang2022metatts}} 與語者編碼（Speaker Encoding）{\color{red} \cite{casanova2024xtts, chen2024f5tts, leng2024fishspeech, zhou2025indextts2}}，但兩者各具其侷限性：
+
+\begin{itemize}
+    \item 語者自適應（Speaker Adaptation）：此方法透過少量樣本微調預訓練的多語者 TTS 模型。雖然音質通常較優，但高品質的適應往往需要數千次的微調步驟，這導致了極大的計算資源消耗與時間成本（可能長達數分鐘甚至數小時）。為了改善此效率問題並降低訓練成本，後續研究如 Meta-TTS \cite{huang2022metatts} 結合了元學習（Meta-Learning）技術以實現少樣本學習（Few-shot）。元學習的核心概念在於「學習如何學習（Learn to learn）」，旨在讓模型獲得快速適應新任務的元知識，使其僅需極少量的樣本即可迅速收斂，達成高效的語者適應。
+    \item 語者編碼（Speaker Encoding）：{\color{red}此方法透過在大規模多語者資料集上預訓練的語者編碼器，將輸入參照語音映射為單一語者嵌入向量（Speaker Embedding）}。其最顯著的優點在於不需重新進行任何微調步驟，即可進行語音複製，實現了零樣本學習（Zero-shot），因此能提供最快的複製速度。然而，其效能高度受限於模型訓練時見過的語者資訊，當面對訓練集之外的陌生語者時，常會因為泛化落差（Generalization Gap）而導致合成聲音的相似度不如預期。
+\end{itemize}
+
+{\color{gray}
+針對生成效果的評鑑，客觀指標常採用詞錯率（WER, Word Error Rate），藉由自動語音識別（ASR, Automatic Speech Recognition）技術量測合成內容與原始文本的一致性。主觀評價則依賴平均意見分數（MOS, Mean Opinion Score），由受測者針對自然度進行 1 至 5 分的評比，其中 1 分為最不自然，5 分則最接近真人。此外，為精確衡量特定聲學面向，亦採用語者相似度（SMOS, Similarity MOS）、韻律（PMOS, Prosody MOS）、音訊品質（QMOS, Quality MOS）、情緒保真度（EMOS, Emotion MOS）等衍生指標，達成對合成語音感知品質的量化。
+}
+
+{\color{red}
+針對語音生成效果的評鑑，常使用主觀指標平均意見分數（MOS, Mean Opinion Score），由受測者針對自然度進行 1 至 5 分的評比，其中 1 分為最不自然，5 分則最接近真人。此外，為精確衡量特定聲學面向，亦採用語者相似度（SMOS, Similarity MOS）、韻律（PMOS, Prosody MOS）、音訊品質（QMOS, Quality MOS）、情緒保真度（EMOS, Emotion MOS）等衍生指標。在客觀評鑑方面，近期語音合成研究普遍採用詞錯率（WER, Word Error Rate）與語者相似度（Speaker Similarity, SS）作為主要指標。得益於自動語音識別（ASR）技術的突破，如 Whisper 與 FunASR 等模型已具備接近人類的辨識水準，大幅提升了 WER 自動化評測的可信度。而在語者相似度方面，則多利用語者確認模型（Speaker Verification Models） 提取語音表徵（Representations），並計算合成語音與參考音訊之間的餘弦相似度（Cosine Similarity），以精確量化兩者在聲學特徵上的吻合程度。
+}
+
+以下將會介紹在三種種類 TTS 中經典做法：{\color{red}採端對端架構且針對單一語者訓練的 Tacotron} \cite{wang2017tacotron}、結合 Meta-Learning 做在語者自適應 Few-shot TTS 的 Meta-TTS \cite{huang2022metatts}、以及結合大語言模型語者編碼 Zero-shot TTS 的 IndexTTS2 \cite{zhou2025indextts2}。
+
+\subsection{Tacotron}
+
+
+Tacotron 由 Google 的研究人員開發，是一種基於序列到序列（seq2seq）\cite{sutskever2014seq2seq}的注意力機制架構，可直接從字元合成語音。如圖\ref{fig:tacotron_model_arch}所示，該模型的核心架構由編碼器、解碼器與後處理網路組成。{\color{red} 編碼器的處理流程始於字元嵌入，隨即進入 Pre-net 模組。Pre-net 由帶有 Dropout 的全連接層組成，作為瓶頸層（Bottleneck Layer）以促進收斂並提升泛化能力。經過 Pre-net 處理後的特徵隨即輸入至 CBHG 模組，該模組依序結合了一維卷積濾波器組（1-D Convolutional Bank）、高速公路網路（Highway Networks）\cite{srivastava2015highway} 與雙向閘控循環單元（bidirectional gated recurrent unit (GRU)\cite{chung2014empirical}）。此設計旨在捕捉類似 N-gram 的局部特徵以及全域的雙向上下文資訊。隨後的解碼階段採用內容導向的 tanh 注意力機制，並透過縮減因子（Reduction Factor）在每個時間步預測多個頻譜幀。}
+
+在特徵生成與音訊重建方面，解碼器輸出的 80 階梅爾頻譜圖會經由後處理網路進一步轉化為線性頻率規模頻譜圖。此階段再次運用 CBHG 模組的雙向處理能力，修正幀級別的預測誤差，強化諧波結構。最終，該系統採用 Griffin-Lim 演算法從線性頻譜圖中合成音訊波形。實驗數據顯示，在美國英語的平均意見分數（MOS）測試中，此模型獲得 3.82 的評分，超越了傳統的生產級參數化合成系統。此外，由於該模型是在幀級別而非樣本級別生成語音，其推理速度明顯優於如 WaveNet 等自迴歸模型。
+
+訓練過程中，該架構直接在文字與音訊配對的原始資料上運行，無需人工標註音素級別的對齊。損失函數採用對解碼器與後處理網路輸出的 L1 損失進行同等加權計算，並透過 Adam 優化器進行訓練。研究指出，Pre-net 中的 Dropout 對於模型在缺乏計畫採樣（Scheduled Sampling）的情況下達成泛化至關重要。消歧義實驗證實，若缺乏 CBHG 或後處理網路，模型的對齊能力與音質解析度將顯著下降。該研究為端對端語音合成奠定了基礎，展現了簡化流水線在應對真實世界噪音數據與適應多樣語音屬性方面的潛力。
+
+評估語音合成的自然度，作者進行了 MOS 測試，測試母語者對 100 個未再訓練中見過的短語，每個短語收集 8 個評分，並且在計算 MOS 時僅計入使用耳機的評分數據。實驗將 Tacotron 與基於 LSTM 的參數式系統（Parametric）\cite{zen2016fast} 以及拼接式系統（Concatenative）\cite{gonzalvo2016recent} 比較。如表\ref{tab:mos_results} 所示，Tacotron 達到了 3.82 的 MOS 分數，成功超越了參數式系統。
+
+\begin{figure}[H]
+  \centering
+  % 左側：上方放圖片，下方放 MOS 表格
+  \begin{minipage}[b]{0.45\textwidth}
+    \centering
+    % 放置 Tacotron 架構圖
+    \includegraphics[width=\textwidth]{images/tacotron_model_arch.png}
+    \caption{Tacotron 模型架構圖\cite{wang2017tacotron}}
+    \label{fig:tacotron_model_arch}
+    
+    \vspace{1em} % 圖與表之間的間距
+    
+    % 放置 MOS 評估表格
+    \scriptsize % 縮小字體以符合寬度
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{系統} & \textbf{MOS} \\
+        \hline
+        Tacotron & $3.82 \pm 0.085$ \\
+        參數式 (Parametric)\cite{zen2016fast} & $3.69 \pm 0.109$ \\
+        拼接式 (Concatenative)\cite{gonzalvo2016recent} & $4.09 \pm 0.119$ \\
+        \hline
+    \end{tabular}
+    \captionof{table}{5 分制平均意見分數 (MOS) 評估\cite{wang2017tacotron}}
+    \label{tab:mos_results}
+  \end{minipage}
+  \hfill
+  % 右側：放詳細的超參數表格
+  \begin{minipage}[H]{0.5\textwidth}
+    \centering
+    \setlength{\tabcolsep}{2pt}
+    \scriptsize % 使用 tiny 字體以確保高度與左側相近
+    \begin{tabular}{|l|l|}
+    \hline
+    Spectral analysis & \emph{pre-emphasis}: 0.97; \emph{frame length}: 50 ms; \\
+                      & \emph{frame shift}: 12.5 ms; \emph{window type}: Hann \\ \hline
+    Char embedding    & 256-D \\ \hline
+    Encoder CBHG      & \emph{Conv1D bank}: $K$=16, conv-$k$-128-ReLU \\
+                      & \emph{Max pooling}: stride=1, width=2 \\
+                      & \emph{Conv1D projections}: conv-3-128-ReLU \\
+                      & $\rightarrow$ conv-3-128-Linear \\
+                      & \emph{Highway net}: 4 layers of FC-128-ReLU \\
+                      & \emph{Bidirectional GRU}: 128 cells \\ \hline
+    Encoder pre-net   & FC-256-ReLU $\rightarrow$ Dropout(0.5) $\rightarrow$ \\
+                      & FC-128-ReLU $\rightarrow$ Dropout(0.5) \\ \hline
+    Decoder pre-net   & FC-256-ReLU $\rightarrow$ Dropout(0.5) $\rightarrow$ \\
+                      & FC-128-ReLU $\rightarrow$ Dropout(0.5) \\ \hline
+    Decoder RNN       & 2-layer residual GRU (256 cells) \\ \hline
+    Attention RNN     & 1-layer GRU (256 cells) \\ \hline
+    Post-processing   & \emph{Conv1D bank}: $K$=8, conv-k-128-ReLU \\
+    CBHG              & \emph{Max pooling}: stride=1, width=2 \\
+                      & \emph{Conv1D projections}: conv-3-256-ReLU \\
+                      & $\rightarrow$ conv-3-80-Linear \\
+                      & \emph{Highway net}: 4 layers of FC-128-ReLU \\
+                      & \emph{Bidirectional GRU}: 128 cells \\ \hline
+    Reduc. factor ($r$) & 2 \\ \hline
+    \end{tabular}
+    \captionof{table}{Tacotron 超參數與網路架構\cite{wang2017tacotron}}
+    \label{tb.params}
+  \end{minipage}
+\end{figure}
+
+\clearpage
+
+\subsection{Meta-TTS}
+
+Meta-TTS 旨在解決傳統文字轉語音模型在適應新說話者時，往往需要大量數據與訓練步驟的挑戰。傳統微調方法通常需要數千步才能獲得高品質結果，不僅速度較慢且容易產生過擬合現象。為了實現少樣本語音複製並加速適應過程，該研究提出了 Meta-TTS 架構，將「與模型無關的元學習算法（MAML）\cite{finn2017maml}」應用於非自回歸模型 FastSpeech 2 之上。透過此結合，模型能學習到一組具備快速適應能力的元初始化參數，使其在面對未見過的新說話者時，僅需極少量的樣本與幾次梯度下降步驟，即可達到良好的合成效能。本節後續將首先闡述其基底架構 FastSpeech 2 的運作原理，接著詳述元學習演算法如何整合應用於該模型之中。
+
+FastSpeech 2 \cite{ren2021fastspeech}為一種非自回歸的文字轉語音模型，主要由編碼器（Encoder）、變異適配器（Variance Adapter）與梅爾頻譜解碼器（Mel-spectrogram Decoder）組成。編碼器由 Transformer 層堆疊而成，負責將音素嵌入序列轉換為隱藏序列以提取上下文；變異適配器負責加入時長、音高與能量等資訊以決定語速與語調；解碼器則將適配後的序列並行轉換為決定音色的梅爾頻譜序列。在多語者版本中，模型將目標語者的嵌入向量（Speaker Embedding）加入變異適配器與解碼器的輸入作為條件，使這兩個模組能根據特定特徵進行生成，而編碼器因僅處理文本內容故不加入說話者資訊。當針對新說話者進行微調時，流程通常會固定編碼器參數，僅利用少量樣本微調語者嵌入以及變異適配器與解碼器，以適應新的聲音特徵。
+
+由於多語者語音合成系統可視為單一語者合成的多任務版本，因此可透過微調將預訓練的多語者模型適應至新說話者。在語者自適應方法中，常見的微調策略主要有兩種：一是僅微調語者嵌入 $\{E_S\}$，二是微調整個模型 $\{\bm{\theta}_E, \bm{\theta}_{VA}, \bm{\theta}_D, E_S\}$。然而，由於原始的語者嵌入查找表 $E_S$ 僅包含訓練集中的說話者資訊，對於測試集中的每位新說話者 $i$，必須初始化一個新的嵌入表 $\hat{E}_S$ 以獲得對應的嵌入向量 $\hat{e}_i$。此外，鑑於編碼器 $\bm{\theta}_E$ 不應受說話者身分制約，微調階段通常不會對其進行更新。綜合考量下，該研究的實驗主要聚焦於同時微調變異適配器、解碼器與新語者嵌入 $\{\bm{\theta}_{VA}, \bm{\theta}_D, \hat{E}_S\}$，以在適應效率與模型效能間取得平衡。
+
+元學習（Meta-learning）又被稱為「學習如何學習（learn to learn）」，其目標在於設計出能利用少量訓練樣本快速適應新環境或學習新技能的模型，因此極為適合應用於少樣本下游任務。與傳統監督式學習針對單一資料集進行擬合不同，元學習係透過在訓練任務集上的擬合，學習出一組良好的模型元初始化參數（Meta-initialization），以利於後續的遷移學習。該研究選用 MAML\cite{finn2017maml} 演算法作為核心，並針對語音合成特性進行了架構調整。具體而言，該研究參考了「幾乎無內迴圈」（Almost No Inner Loop, ANIL）\cite{Raghu2020anil}的概念，但其基本理念有所不同。ANIL 基於特徵重用（Feature Reuse）的觀察，僅在內迴圈更新最後一層參數；然而，該研究指出在 Meta-TTS 中並未觀察到顯著的特徵重用現象，而是根據模組職責進行區分。鑑於變異適配器、解碼器與語者嵌入對說話者適應的影響較為顯著，該研究設計在內迴圈中僅針對這些與說話者高度相關的模組進行梯度更新，而固定編碼器參數，隨後在外迴圈中才對整體模型進行元更新。
+
+圖 \ref{fig:metatts_model} 該圖左半部表示內迴圈之前的初始模型參數 $\theta$，而右半部則表示經過內迴圈梯度下降後的自適應模型參數 $\theta_i$。圖中紅色虛線箭頭與紅色方塊明確標示出哪些參數（即變異適配器、解碼器與語者嵌入）在內迴圈過程中進行了更新。在完成內迴圈適應後，系統將查詢集的輸入資料前饋至右側已適應的模型中，並計算其輸出損失作為該元任務的損失。最終，該損失將依循綠色虛線箭頭的路徑，從圖的右上角反向傳播回圖左半部的初始模型參數，以完成外迴圈的參數優化。
+
+為了驗證 Meta-TTS 在少樣本語者適應任務上的有效性，該研究使用了 LibriTTS 的 train-clean-100 子集進行模型訓練，並在 LibriTTS test-clean 與 VCTK 資料集上進行測試。實驗中的基準模型（Baseline）指未經元學習訓練、僅透過傳統微調進行適應的多語者 FastSpeech 2 模型。在主觀評估方面，實驗集中於 10 個適應步驟（Adaptation steps）的情境下測量相似度平均意見分數（SMOS）。實驗中使用該聲碼器將真實梅爾頻譜圖轉換為參考基線（稱為重構語音），並將其評測結果視為合成語音相似度的理論上限。表 \ref{tab:speaker_similarity} 的結果顯示，無論是在同源的 LibriTTS 或跨源的 VCTK 測試中，Meta-TTS 的表現皆顯著優於基準模型，SMOS 分數差距超過 1 分。在客觀評估方面，圖 \ref{fig:adaptation_steps} 展示了不同適應步驟下的餘弦相似度矩陣。觀察矩陣變化可知，基準模型約需 50 個適應步驟才能顯現出與目標語者相似的對角線模式，而 Meta-TTS 僅需 5 至 10 個步驟即可達到同等清晰度，證實其在極少量的更新步驟下即可快速生成高相似度的目標語音。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/metatts-model-arch.png} 
+    \caption{Meta-TTS 訓練 MAML 流程圖\cite{huang2022metatts}}
+    \label{fig:metatts_model}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\textwidth]{images/MetaTTS_exp_adapt.png}
+    \caption{不同適應步驟下的餘弦相似度矩陣\cite{huang2022metatts}}
+    \label{fig:adaptation_steps}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{llcccc}
+        \toprule
+        \multirow{2}{*}{Approach} & \multirow{2}{*}{Adaptation} & \multicolumn{2}{c}{LibriTTS} & \multicolumn{2}{c}{VCTK} \\
+        \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+         & & Emb table $\hat{E}_S$ & Shared $e_S$ & Emb table $\hat{E}_S$ & Shared $e_S$ \\
+        \midrule
+        Real & & \multicolumn{2}{c}{$4.29 \pm 0.27$} & \multicolumn{2}{c}{$4.54 \pm 0.09$} \\
+        Reconstructed & & \multicolumn{2}{c}{$3.33 \pm 0.29$} & \multicolumn{2}{c}{$4.08 \pm 0.12$} \\
+        \midrule
+        Baseline & 10 steps & $1.53 \pm 0.18$ & $1.34 \pm 0.21$ & $1.56 \pm 0.12$ & $1.32 \pm 0.13$ \\
+        Meta-TTS & 10 steps & $\mathbf{2.77 \pm 0.24}$ & $\mathbf{2.67 \pm 0.28}$ & $\mathbf{3.14 \pm 0.16}$ & $\mathbf{3.45 \pm 0.14}$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{以相似度平均意見分數 (SMOS) 評估之語者相似度（95\% 信賴區間）\cite{zhou2025indextts2}}
+    \label{tab:speaker_similarity}
+\end{table}
+
+\subsection{IndexTTS2}
+
+IndexTTS2 是由 bilibili 人工智慧平台部門提出的一種大型自回歸零樣本語音合成模型。當前語音合成技術已顯著轉向以大型語言模型（LLM）驅動的開發路徑，隨著如 XTTS \cite{casanova2024xtts}、F5-TTS \cite{chen2024f5tts} 與 Fish-Speech \cite{leng2024fishspeech} 等系統透過ㄉ大量語音記號（speech tokens）與大規模數據訓練，系統得以在複雜的潛在空間（Latent space）中穩健捕捉音色（Timbre）與韻律（Prosody）。此類進展有效解決了以往編碼器面對陌生講者時相似度不足的痛點。IndexTTS2 的核心創新在於解決了自回歸（AR）模型對時間掌控的困難，提出了一種既能精確控制時長，又能將語者身分與情感表達獨立控制的架構。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_model_structure.png}
+    \caption{IndexTTS2 模型架構圖\cite{zhou2025indextts2}}
+    \label{fig:model_structure}
+\end{figure}
+
+該模型採用級聯式架構，由文字轉語意（Text-to-Semantic, T2S）、語意轉梅爾頻譜（Semantic-to-Mel, S2M）以及聲碼器（Vocoder）三個核心模塊組成。T2S 模塊負責從文本生成語意記號，S2M 模塊將這些記號轉換為梅爾頻譜圖，最後由 BigVGANv2 聲碼器將頻譜圖轉換為音訊波形。為了增強情緒表達的穩定性與清晰度，該研究設計了一種三階段訓練策略。第一階段使用全量數據訓練基礎模型並隨機歸零時長嵌入以支援自由生成；第二階段引入梯度反轉層（GRL, Gradient Reversal Layer）\cite{yaroslav2016GRL}與情緒適配器，專注於情緒特徵與語者特徵的解耦；第三階段則凍結所有特徵調節器，對全模型進行微調以提升魯棒性。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_T2S.png}
+    \caption{IndexTTS2 T2S 模塊架構圖\cite{zhou2025indextts2}}
+    \label{fig:t2s_structure}
+\end{figure}
+
+在文字轉語意（T2S）模塊中，模型採用自回歸 Transformer 架構，其輸入序列定義為 $[c, p, e_{\langle BT\rangle}, E_{text}, e_{\langle BA\rangle}, E_{sem}]$，其中 $c$ 代表語者屬性，$p$ 為時長控制嵌入，$E_{text}$ 與 $E_{sem}$ 分別為文本與語意記號的嵌入向量。為了降低情緒控制的門檻，該研究引入了文字轉情緒（Text-to-Emotion, T2E）模塊，利用知識蒸餾技術將 Deepseek-r1 的推論能力轉移至參數量較小的 Qwen-3-1.7b 模型。該模塊能將自然語言描述映射為情緒機率分布，進而生成情緒向量 $e$ 供 T2S 使用。在時長控制方面，透過約束時長嵌入表 $W_{num}$ 與語意位置嵌入表 $W_{sem}$ 相等（即 $W_{sem}=W_{num}$），模型能精確將位置資訊與目標時長 $T$ 對齊。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_S2M.png}
+    \caption{IndexTTS2 S2M 模塊架構圖\cite{zhou2025indextts2}}
+    \label{fig:s2m_structure}
+\end{figure}
+
+語意轉梅爾頻譜（S2M）模塊則採用基於流匹配（Flow Matching）的非自回歸架構，該架構通過學習常微分方程（ODE）將雜訊分布映射至目標梅爾頻譜。研究團隊發現，在合成高強度的情緒語音時，僅依賴語意記號可能導致發音含糊不清（slurring）的問題。為解決此問題，該模塊引入了 GPT 隱含特徵增強機制，將 T2S 模塊最後一層 Transformer 的輸出 $H_{GPT}$ 與語意特徵進行融合。由於 $H_{GPT}$ 包含豐富的文本與上下文資訊，這種融合顯著提升了情緒表達下的語音清晰度與穩定性。
+
+為了驗證 IndexTTS2 的效能，該研究在 LibriSpeech test-clean 等公開資料集上進行了評估，並與 MaskGCT、F5-TTS、CosyVoice2、SparkTTS、IndexTTS 等先進的零樣本學習基準模型進行對比。實驗結果顯示（如表 \ref{tab:indextts2_perf}），IndexTTS2 在語者相似度（SS）等客觀指標上達到了 0.870，而在 LibriSpeech 測試集的主觀聽測實驗（MOS）中，IndexTTS2 的表現均優於其他所有基準模型。消融實驗進一步證實，若移除 GPT 隱含特徵增強，字錯率（WER）將從 3.115\% 上升至 3.334\%，顯示該機制對維持發音清晰度的重要性。
+
+\begin{table}[H]
+\centering
+\caption{IndexTTS2 與其他基準模型在 LibriSpeech test-clean 資料集上的效能比較\cite{zhou2025indextts2}}
+\label{tab:indextts2_perf}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lccccc}
+\hline
+\textbf{Model} & \textbf{SS} $\uparrow$ & \textbf{WER (\%)} $\downarrow$ & \textbf{SMOS} $\uparrow$ & \textbf{PMOS} $\uparrow$ & \textbf{QMOS} $\uparrow$ \\
+\hline
+Ground Truth & 0.833 & 3.405 & $4.02 \pm 0.22$ & $3.85 \pm 0.26$ & $4.23 \pm 0.12$ \\
+MaskGCT      & 0.790 & 7.759 & $4.12 \pm 0.09$ & $3.98 \pm 0.11$ & $4.19 \pm 0.19$ \\
+F5-TTS       & 0.821 & 8.044 & $4.08 \pm 0.21$ & $3.73 \pm 0.27$ & $4.12 \pm 0.13$ \\
+CosyVoice2   & 0.843 & 5.999 & $4.02 \pm 0.22$ & $4.04 \pm 0.28$ & $4.17 \pm 0.25$ \\
+SparkTTS     & 0.756 & 8.843 & $4.06 \pm 0.20$ & $3.94 \pm 0.21$ & $4.15 \pm 0.16$ \\
+IndexTTS     & 0.819 & 3.436 & $4.23 \pm 0.14$ & $4.02 \pm 0.18$ & $4.29 \pm 0.22$ \\
+\textbf{IndexTTS2} & 0.870 & \textbf{3.115} & \textbf{4.44 $\pm$ 0.12} & \textbf{4.12 $\pm$ 0.17} & \textbf{4.29 $\pm$ 0.14} \\
+\hline
+- GPT latent & \textbf{0.887} & 3.334 & $4.33 \pm 0.10$ & $4.10 \pm 0.12$ & $4.17 \pm 0.22$ \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+

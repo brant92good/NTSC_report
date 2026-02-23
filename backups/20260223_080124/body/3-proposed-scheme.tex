@@ -1,0 +1,208 @@
+\section{實驗資料集}
+\label{sec:dataset}
+
+為了全面評估模型效能，本實驗採用了以下三個主要的資料集：
+
+\begin{enumerate} \item \textbf{ASVspoof 系列資料集}： 
+
+ASVspoof (Automatic Speaker Verification Spoofing and Countermeasures Challenge) 為該領域公認的權威基準。本研究整合了 2019 年與 2021 年的任務場景，以評估模型在傳統攻擊與現代通訊變異下的表現：
+    
+    \begin{itemize}
+        \item \textbf{ASVspoof 2019 Logical Access (LA)}：作為模型訓練的核心基準，該資料集模擬偽造語音透過通訊系統直接注入的情境。其語料源於 VCTK 資料庫，涵蓋由 17 種文字轉語音 (TTS) 與語音轉換 (VC) 演算法生成的樣本，包含神經聲學模型（如 WaveNet）生成的偽造特徵。
+        
+        \item \textbf{ASVspoof 2021 Logical Access (LA)}：延續 2019 LA 的語料基礎，但進一步引入真實電信網路（VoIP 與 PSTN）傳輸所產生的通道損耗。其經過 A-law、G.722 與 $\mu$-law 等七種不同編解碼器處理，旨在測試模型對於通訊系統所產生的假影（Artifacts）之強健性。
+        
+        \item \textbf{ASVspoof 2021 DeepFake (DF)}：專注於社群媒體與網路傳播場景，偽造樣本由超過 100 種欺騙演算法生成。此子集引入了大量有損壓縮（Lossy compression）處理，包含不同位元速率下的 mp3、m4a 與 ogg 格式，總時數約 454.4 小時，是目前對壓縮抗性要求最高的場景。
+    \end{itemize}
+
+\item \textbf{MLAAD (Multilingual Audio Anti-Spoofing Dataset)}：
+
+MLAAD 是一個包含 23 種多語言的大型偽造語音資料集，第二版長度達 160.2 小時，而第八版則達 570.3 小時，所有音訊均以 22.05 kHz 格式輸出。其攻擊樣本生成基於 M-AILABS 語音庫中的真實語音，利用 52 種先進文字轉語音（TTS）模型與 19 種不同架構（如 VITS、FastSpeech 等）製作，生成來源廣泛涵蓋 [Coqui.ai](http://coqui.ai/) 與 Hugging Face 等開源平台。由於 MLAAD 本身僅包含偽造語音 (Spoof only) 樣本，無法單獨用於訓練二元分類器。因此，在訓練階段，我們參考論文作者建議，將其與此資料集基於的上游全真音訊資料集 \textbf{M-AILABS} 進行混合，以構建完整訓練數據。而在測試階段，我們關注模型對該資料集中偽造語音的檢出率。
+
+\item \textbf{InTheWild (ITW)}：
+
+為了評估模型在實驗室外的泛化能力，本實驗為此採用 InTheWild 資料集作為獨立的跨資料集測試使用。此資料集專門收集自公開的網路來源，用以彌補 ASVspoof 2019 僅基於 VCTK 錄音室語料庫所帶來的局限性。ITW 資料集總長 37.9 小時，精選了 58 位英語名人與政治人物的語音剪輯。其內容被劃分為 17.2 小時的偽造 (fake) 音訊與 20.7 小時的真實 (real) 音訊。偽造音訊是從 219 個公開可用的影片與音訊檔案中分割建構。所有音訊經標準化處理並轉換為 16 kHz 取樣率，平均片段長度約 4.3 秒，整體語料真偽比例維持相較平衡 (37.18\%)。
+
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{實驗資料集統計概覽}
+\label{tab:dataset_stats}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Name}  & \textbf{Languages} & \textbf{Systems} & \textbf{Utterances} & \textbf{Avg. Dur.} & \textbf{Total Dur.} & \textbf{Spoof Utterances Ratio} \\ \hline
+ASVspoof19 LA & English &  19  & 121,461 & 3.25s & 109.7hr  & 89.72\%  \\
+ASVspoof21 LA & English &  13  & 164,612 & 2.72s & 111.8hr  & 90.00\%  \\
+ASVspoof21 DF & English & 100+ & 593,253 & 3.06s & 454.4hr  & 97.21\%  \\
+In-The-Wild   & English &   ?  &  31,779 & 4.29s &  37.9hr  & 37.18\%  \\
+M-AILABS      & 8       &   0  & 493,658 & 7.23s & 991.1hr  &  0.00\%  \\
+MLAAD v2      & 23      &  52  &  72,000 & 7.79s & 160.2hr  & 100.00\% \\
+MLAAD v8      & 40      & 119  & 243,000 & 8.45s & 570.3hr  & 100.00\% \\ \hline
+\end{tabular}
+} %
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{images/dataset_duration.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\clearpage
+
+\section{模型配置與參數設定}
+\label{sec:model_description}
+
+\subsection{硬體環境與實驗控制} 
+所有的實驗均在單張 \textbf{NVIDIA RTX 3090 (24GB VRAM)} 顯卡上進行。為了消除不同模型原始實作中因浮點數精度差異可能帶來的效能影響，並優化記憶體使用效率，本研究對實驗環境進行了以下兩項關鍵的標準化控制：
+
+\begin{enumerate} \item \textbf{統一精度 (Unified Precision)}： 儘管 W2V-AASIST 與 MFA-Conformer 的原始實作採用 FP32 精度，本研究將所有實驗模型的運算精度統一設定為 \textbf{bfloat16}。此舉不僅確保了模型間比較的公平性，更大幅降低了大型模型 (如 SSL-AASIST) 的記憶體佔用，使得我們能夠在單卡環境下使用更大的 Batch Size 進行更穩定的訓練。
+
+\item \textbf{統一損失函數 (Unified Loss Function)}：
+為了應對訓練資料中真實與偽造語音可能存在的數量不平衡問題，我們摒棄了 SpeechPrompt 與 MFA-Conformer 原本使用的標準交叉熵 (CE)，將所有模型的損失函數統一固定為 \textbf{加權交叉熵 (Weighted Cross Entropy, WCE)}。這與 W2V-AASIST 的原始設定保持一致，確保所有模型在相同的優化目標下進行學習。
+
+\end{enumerate}
+
+\subsection{模型實作細節}
+
+\subsubsection{SSL-AASIST (W2V-AASIST)} 該模型以原始波形 (Raw Waveform) 作為輸入。由於其前端依賴參數高達 3 億的 wav2vec 2.0 XLSR 模型，為了適應單卡 3090 的記憶體限制並保持訓練穩定性，我們利用 bfloat16 帶來的空間優勢，將 Batch Size 從原始文獻的 14 提升至 40。根據線性縮放原則，我們相應地調整了學習率，將 Adam 優化器的 Learning Rate 從 $10^{-6}$ 調整至 $5\times 10^{-6}$。輸入長度 (Context Window) 固定為 4 秒。
+
+\subsubsection{MFA-Conformer} 本研究復現了基於 Conformer 的架構，該模型以 \textbf{80 維梅爾頻譜圖 (Mel-spectrogram)} 作為輸入特徵。實驗中使用 NVIDIA NeMo 提供的預訓練權重 \texttt{stt\_en\_conformer\_ctc\_small} 進行初始化，其餘超參數與參考文獻保持一致：模型輸入長度設定為 5 秒，Batch Size 設定為 64。優化器採用 Adam，並搭配 Cosine Annealing 排程器 (Scheduler)，包含 Warmup 階段，最高學習率設定為 $10^{-3}$。
+
+\subsubsection{SpeechPrompt v2} SpeechPrompt 架構採用離散單元 (Discrete Tokens) 作為輸入。由於離散化後的特徵序列長度大幅縮減，除 MLAAD 資料集中極少數超過 100 秒的異常樣本外，模型可將完整的語音長度納入 Context Window 中，無需進行截斷。實驗採用 \texttt{fairseq} 框架進行訓練，由於該框架專為自然語言任務設定特性，會自動根據不同輸入長度動態調整Batch Size 以盡可能貼近指定的max token數量，用以穩定訓練階段的VRAM占用，我們採用原始論問的參數進行訓練。
+在 Prompt 設定方面，我們依據文獻建議 ，啟用 \textbf{Deep Prompt} 機制，並將 Prompt Length 設定為 5。優化器學習率設定為 $5\times 10^{-3}$，由於prompt tuning過程的收斂速度極快，原始論文作法設定 Early Stopping 的 Patience 為 1。
+
+
+
+\section{核心模型效能驗證}
+\label{sec:model_performance}
+
+\textbf{評估指標}：針對不同的測試情境，本研究採用兩種主要指標。首先，適用於 ASVspoof 與 InTheWild 等包含正負樣本的完整測試集，我們採用 \textbf{等錯誤率 (Equal Error Rate, EER)} 作為主要評估標準。EER 是指透過調整系統的決策閾值 ($\theta$)，當系統的錯誤接受率 (False Acceptance Rate, FAR) 等於錯誤拒絕率 (False Rejection Rate, FRR) 時的對應數值，其數學定義如下：
+\begin{equation}
+    EER = FAR(\theta) = FRR(\theta)
+\end{equation}
+\begin{equation}
+    \text{where } FAR = \frac{\text{False Acceptances}}{\text{Total Impostor Attempts}}, \quad FRR = \frac{\text{False Rejections}}{\text{Total Genuine Attempts}}
+\end{equation}
+由此可知，EER 的數值越低，代表系統的辨識與防偽性能越佳。其次，對於 MLAAD 資料集，因其全數為偽造語音（不包含真實語音），無法計算傳統的 EER。因此，我們改採 \textbf{偵測準確率 (Detection Accuracy, ACC)}，即計算模型成功將樣本判定為「Spoof」的比例作為準確率指標。
+
+\begin{table}[H]
+\centering
+\caption{各模型在不同資料集與訓練設定下之效能表現}
+\label{tab:main_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc|cc}
+\toprule
+\multirow{2}{*}{\textbf{Model}} & \multirow{2}{*}{\textbf{Train Data \textbackslash\ Test on}} & \multicolumn{4}{c|}{\textbf{EER}} & \multicolumn{2}{c}{\textbf{Accuracy}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-8}
+& & \textbf{ASV19 LA} & \textbf{ASV21 LA} & \textbf{ASV21 DF} & \textbf{ITW} & \textbf{MLAADv2} & \textbf{MLAADv8} \\
+\midrule
+\multirow{4}{*}{W2V-AASIST} 
+& ASV19 & 0.27\% & 0.87\% & 5.57\% & 13.30\% & 83.24\% & 71.04\% \\
+& ITW & 7.14\% & 10.90\% & 5.98\% & \cellcolor{gray!30}- & 55.48\% & 49.12\% \\
+& MLAADv2 & 21.29\% & 30.26\% & 28.39\% & 18.77\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+& MLAADv8 & 26.85\% & 30.61\% & 23.48\% & 16.03\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+\midrule
+\multirow{4}{*}{SpeechPrompt v2} 
+& ASV19 & 18.50\% & 18.23\% & 28.94\% & 67.91\% & 99.65\% & 99.48\% \\
+& ITW & 22.23\% & 25.10\% & 31.80\% & \cellcolor{gray!30}- & 98.26\% & 98.50\% \\
+& MLAADv2 & 43.92\% & 44.68\% & 51.12\% & 63.31\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+& MLAADv8 & 45.10\% & 46.20\% & 50.80\% & 65.10\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+\midrule
+\multirow{4}{*}{MFA-Conformer} 
+& ASV19 & 1.12\% & 5.67\% & 16.00\% & 30.48\% & 92.61\% & 88.04\% \\
+& ITW & 19.93\% & 26.48\% & 23.39\% & \cellcolor{gray!30}- & 37.31\% & 38.72\% \\
+& MLAADv2 & 34.90\% & 41.34\% & 38.14\% & 31.34\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+& MLAADv8 & 45.27\% & 45.76\% & 42.98\% & 32.75\% & \cellcolor{gray!30}- & \cellcolor{gray!30}- \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+本節將整理並對比各模型架構在不同測試集下的實驗結果，詳細數據請見表 \ref{tab:main_results}。前四個測試集（ASV19、ASV21 LA、ASV21 DF、ITW）以等錯誤率 (EER) 為評估指標；後兩個測試集（MLAADv2、MLAADv8）則以準確率 (Accuracy) 呈現。依據原始設計，我們僅對 \textbf{W2V-AASIST} 採用了其原始論文建議的資料增強 (DA) 策略。（在初步實驗中，我們亦嘗試對 MFA-Conformer 與 SpeechPrompt v2 施加相同的 DA 策略，但結果顯示這對模型效能並無顯著提升，因此為了保有其原始評估的純粹性，最終對比中這兩者皆維持不使用 DA 的設定）。
+
+\textbf{實驗可重複性與真實效能探討}：在此必須特別說明，本研究所呈現之所有客觀評估數據，皆是基於三組不同隨機亂數種子（Random Seeds）進行獨立完整訓練後所取之平均結果。我們並未仿效部分文獻中為追求單一最高指標 (SOTA) 而採取在測試集上頻繁挑選最佳檢查點（Cherry-picking Checkpoints）的極端做法。因此，本實驗忠實呈現的結果與原文字面宣稱數據可能存在落差。例如：SpeechPrompt v2 原始文獻聲稱其模型於 ASV19 LA 能達到 13.5\% 的 EER，而本研究平均僅取得 18.50\%。需要強調的是，即使我們完全依照原始文獻採用 float16 精度，並在測試階段頻繁針對驗證集抽取特定 Checkpoint 進行極端測試（刷榜），最高也僅能勉強將 EER 推進至 15\% 左右，始終無法重現 13.5\% 的極端數據。這也證實了效能的落差並非單純源自我們為了公平對比而採用的 bfloat16 統一精度配置。綜合上述，我們堅持採用更嚴格的三組平均評估標準，避免選擇性保留極端極值的偏差。這些誠實未經修飾的數據，反而更能客觀反映出模型面對未知攻擊時、未經刻意挑選保護的真實防禦下限。
+
+\textbf{基於標準資料集訓練之表現}：當以標準測試集 (ASV19) 進行訓練時，\textbf{W2V-AASIST} 在同領域及跨領域 (ASV21 LA/DF) 測試上均展現出顯著的優勢，EER 分別低至 0.27\%、0.87\% 與 5.57\%。\textbf{MFA-Conformer} 的表現居次，在 ASV19 上獲得 1.12\% 的 EER，但在跨領域的 DF 測試集上升至 16.00\%。相對而言，\textbf{SpeechPrompt v2} 在這幾個資料集上的表現明顯落後，EER 皆高於 18\%。而在真實場景測試 (InTheWild, ITW) 中，也觀察到類似的趨勢：以 ASV19 訓練的模型，在 ITW 上 W2V-AASIST 能維持 13.30\% 的 EER，而 MFA-Conformer 與 SpeechPrompt v2 則分別大幅退步達到 30.48\% 與 67.91\% 的錯誤率。
+
+\textbf{基於跨領域資料集訓練之結果}：當改以 ITW 作為訓練資料時，所有模型在 ASV 系列上的表現皆普遍不如以 ASV19 訓練的成績。其中，W2V-AASIST 在 ASV19 LA 上維持了 7.14\% 的 EER，依然是三個架構中表現最好的；MFA-Conformer 與 SpeechPrompt v2 則分別為 19.93\% 與 22.23\%，顯示出基礎的反向跨資料集測試依然具備相當的挑戰性。此外，當分別以 MLAAD (v2 或 v8) 進行訓練後去測試其他資料集時，所有架構的 EER 都出現了巨幅的上升，效能全面下滑，顯示出各別依賴於單一資料集的模型特徵極易受限。我們能夠發現這些模型在跨資料集訓練的挑戰上依然存在巨大的模型侷限性。
+
+\textbf{針對 MLAAD 測試集之表現}：在 MLAAD (v2 與 v8) 的評估中，資料呈現出截然不同的反向趨勢。當同樣使用 ASV19 進行訓練時，在 ASV 與 ITW 系列表現最為墊底的 SpeechPrompt v2，卻在 MLAADv2 與 MLAADv8 上達到極高的準確率 (99.65\% 與 99.48\%)；MFA-Conformer 亦有約 88\%-92\% 的準確率；相較之下，在其他測試集表現最穩定的 W2V-AASIST 準確率反而僅約 71\%-83\%。相關現象的深層分析將保留至後續章節與其他消融實驗一起探討。
+
+\section{消融實驗與延伸分析}
+\label{sec:discussion}
+
+本節針對上述核心實驗中觀察到的現象與模型特性進行深入的消融實驗與延伸分析。
+
+\subsection{Prompt Tuning 與 Full Fine-Tuning 之極限對比}
+\label{subsec:pt_vs_fft}
+為了釐清 SpeechPrompt 性能受限的主因，究竟是源於 Prompt Tuning 方法本身的表達能力不足，還是 GSLM 預訓練模型本身就不具備深偽偵測所需的聲學特徵，我們將測試基準擴展到全模型微調 (Full Fine-Tuning) 並將其視為在此特徵空間下的效能上限 (Upper Bound)。相關數據如表~\ref{tab:exp1_speechprompt} 所示。
+
+\begin{table}[H]
+\centering
+\caption{SpeechPrompt v2 在 Prompt Tuning 與 Full Fine-Tuning (Upper Bound) 效能比較}
+\label{tab:exp1_speechprompt}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Dataset} & \textbf{Prompt Tuning} & \textbf{Full Fine-Tuning (Upper Bound)} \\
+\midrule
+ASVspoof 19 LA & 18.50\% & 17.23\% \\
+ASVspoof 21 LA & 18.23\% & 17.60\% \\
+ASVspoof 21 DF & 28.94\% & 29.90\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+實驗結果顯示，相較於僅使用 Prompt Tuning，全參數量微調 (Full Fine-Tuning) 僅在 LA 任務上帶來小幅度的進步（EER 由 18.50\% 降至 17.23\%），而在深偽難度較高的 DF 任務上甚至出現略微退步（EER 由 28.94\% 上升至 29.90\%）。這項結果印證了兩個關鍵洞察：(1) \textbf{Prompting 的參數效率極高}：僅訓練極少量的 Prompt 參數即可達到接近全系統微調的效能水準，並且在面對未知的跨域攻擊時，能藉由避免極度過擬合 (Overfitting) 來維持同等的防禦下限；(2) \textbf{瓶頸在於前端特徵}：即使開放所有基礎語言模型參數進行微調，也無法取得跨越式的大幅效能進展。這暗示著效能天花板並非源於後端語言模型的學習能力不足，而是前端 S2u (Speech-to-unit) 階段的離散化轉換過程造成了防偽所需的細微連續聲學特徵流失，使得模型在先天上即缺乏辨別真假的關鍵輸入訊號。
+
+儘管 SpeechPrompt 在極限偵測準確度上受限於離散特徵天花板，未能超越 W2V-AASIST，但其在「參數效率 (Parameter-Efficient)」上展現的壓倒性優勢，正是未來實務部署的重要指引。
+\textbf{在可訓練參數量方面}，W2V-AASIST 為了達到最佳性能，必須對前端 Wav2Vec 2.0 (XLSR) 進行全參數微調，總可訓練參數量高達 \textbf{317M}。MFA-Conformer (Small) 雖然較為輕量，但仍需訓練約 \textbf{14.6M} 個參數。相比之下，SpeechPrompt 採用 Prompt Tuning 機制，凍結了龐大的 GSLM 骨幹，僅需訓練 Input Prompts、Deep Prompts 與 Verbalizer。在 Prompt Length $X=5$ 的設定下，其可訓練參數僅為 \textbf{129,640 (約 0.13M)}。這意味著 SpeechPrompt 的參數量僅為 W2V-AASIST 的 \textbf{0.04\%}，極大程度地降低了模型儲存與部署的門檻。
+
+\textbf{在訓練時間成本方面}，三者呈現了巨大的差異。(1) \textbf{W2V-AASIST}：由於模型龐大且需處理 Raw Waveform，計算負擔極重。在設定 100 Epoch (針對超大型 MLAAD 資料集調整為 30 Epoch) 的情況下，完整訓練一次需耗時 \textbf{24 至 36 小時}。(2) \textbf{MFA-Conformer}：得益於頻譜特徵的維度縮減，其訓練速度較快。在固定 50 Epoch 的設定下，完整訓練約需 \textbf{2 小時}。(3) \textbf{SpeechPrompt v2}：展現了極致的訓練速度。由於輸入為預先計算好的離散 Token，且需更新的參數極少，模型收斂極快。實驗顯示，其完整訓練過程僅需約 \textbf{300 秒 (5 分鐘)}。綜上所述，SpeechPrompt 展現了以「5 分鐘對比 36 小時」之驚悚的反差，強烈突顯了 Prompt Tuning 技術應用於語音任務之巨大潛能。
+
+\subsection{軟性離散特徵輸入架構評估}
+\label{subsec:soft_discrete}
+\textcolor{red}{為了驗證「離散化導致特徵流失」的假設，並嘗試在不改變模型主體架構的前提下找回遺失的聲學細節，我們提出了一種軟性離散特徵的輸入機制。在原始的 SpeechPrompt 中，HuBERT 輸出的連續特徵會被硬性分配給最接近的中心點。本實驗中，我們改為計算特徵與中心點的相似度分數，並以此分數作為權重，將中心點的 Embedding 進行加權求和作為模型的輸入。我們預期透過這種方式，能在一定程度上保留原始音訊在特徵空間中的相對位置資訊，從而補償量化損失。（此實驗尚在進行中）}
+
+\subsection{預訓練模型擴容對跨域偵測之影響}
+\label{subsec:model_size_scaling}
+MFA-Conformer (Small) 在 ASV21 DeepFake (DF) 任務上與 W2V-AASIST 存在顯著落差（EER 13.43\% vs 5.57\%）。為了假設這是否源於模型容量不足，我們將前端替換為更大型的 \texttt{Conformer-Medium} 與 \texttt{Conformer-Large}。實驗評估數據如表~\ref{tab:exp3_model_size} 所示：即便將模型規模大幅提升，在 DF 測試集上的 EER 並未出現顯著下降，性能呈現飽和狀態（甚至 \texttt{Medium} 的錯誤率還略高於 \texttt{Small}）。這暗示了單純增加神經網路參數量並無法解決該架構在跨域深偽偵測上的關鍵瓶頸。
+
+\begin{table}[H]
+\centering
+\caption{MFA-Conformer 不同預訓練模型規模之效能 (EER) 比較}
+\label{tab:exp3_model_size}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model Size} & \textbf{ASV19 LA} & \textbf{ASV21 LA} & \textbf{ASV21 DF} \\
+\midrule
+Conformer-Small & 1.25\% & 4.58\% & 13.43\% \\
+Conformer-Medium & 1.13\% & 3.84\% & 14.20\% \\
+Conformer-Large & 1.80\% & 6.52\% & 13.31\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{前端多層次特徵與圖神經網路後端之融合}
+\label{subsec:backend_improvement}
+我們推測 MFA 原始架構中簡單的統計池化與線性分類器可能無法完全整合 Conformer 抽取的複雜特徵，因此嘗試將後端替換為 AASIST 架構。在實驗過程中，我們對於特徵選取與丟棄策略進行了數組不同的測試對比，最終發現將 MFA-Conformer 中各層的特徵 (All layer) 全數導入後端能得到最佳的效能提升。基於此「All layer」設定的實驗數據如表~\ref{tab:exp4_mfaconformer} 與原始基礎對齊呈現。
+
+\begin{table}[H]
+\centering
+\caption{MFA-Conformer 不同後端分類器架構之效能 (EER) 比較}
+\label{tab:exp4_mfaconformer}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model Backend} & \textbf{ASV19 LA} & \textbf{ASV21 LA} & \textbf{ASV21 DF} \\
+\midrule
+Linear Classifier (Baseline) & 1.12\% & 5.67\% & 16.00\% \\
+AASIST Architecture (using All layer) & 0.86\% & 3.94\% & 12.71\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+結果顯示這項改良帶來了顯著的性能提升：ASV19 LA 的 EER 從 1.12\% 下降至 0.86\%；ASV21 LA 亦由 5.67\% 改善至 3.94\%；在處理難度最高的 ASV21 DF 資料集時，表現進步到 12.71\%。這證明原先簡易的分類網絡限制了 MFA-Conformer 的潛能，透過引入圖神經網路等更強大的特徵融合機制（如 AASIST），確實能更有效率地聚合多層次的前端特徵，並進一步增強防偽系統的穩健性。

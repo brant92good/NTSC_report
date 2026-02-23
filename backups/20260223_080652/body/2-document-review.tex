@@ -1,0 +1,460 @@
+\section{語音合成技術}
+目前在語音合成技術中最普遍的應用為文字轉語音（TTS, Text to Speech），其流程為輸入一段文本序列並產出相應的語音訊號。TTS 領域包含多種技術手段，從早期的單一語者端對端架構，發展至整合遷移學習（Transfer Learning）的多語者模型。近期研究則逐漸轉向以大型語言模型（LLM, Large Language Model）驅動的架構，利用海量通用語音數據提升生成效能，並根據生成機制分為逐記號產生的自回歸（AR, Auto-Regressive）與並行預測的非自回歸（non Auto-Regressive）系統。
+
+在語音合成技術的演進過程中，傳統的統計參數語音合成管道極為複雜，通常包含文本分析前端、時長模型、聲學特徵預測模型以及基於信號處理的聲碼器等複數階段 \cite{zen2016fast}。由於各個元件需依賴大量的領域專業知識進行獨立設計與訓練，各階段產生的預測錯誤往往會不斷累積，導致最終合成音訊的自然度受限且工程開發成本高昂。為了解決上述多階段系統的侷限性，端對端（End-to-End）生成模型架構（如 Tacotron \cite{wang2017tacotron}）應運而生。該類模型具備從字元序列直接映射至原始頻譜圖的能力，僅需透過「文本－音訊」對即可從頭開始進行訓練，無需人工預先標註音素等級的對齊資訊。
+
+為了提升個人化語音合成（亦稱語音複製 Voice Cloning）的實用性，利用少數的樣本來生成高品質的目標聲音已成為目標。針對此需求，學界引入了遷移學習（Transfer Learning）的技術框架。在語音領域，遷移學習通常先在大型語音數據集上訓練一個預訓練模型，隨後將此模型的知識應用於目標任務中。目前在遷移學習的架構下，構建個人化語音系統主要有兩大路徑，分別透過不同的方式處理預訓練模型的知識遷移：語者自適應（Speaker Adaptation{\color{red} \cite{chen2021adaspeech, huang2022metatts}} 與語者編碼（Speaker Encoding）{\color{red} \cite{casanova2024xtts, chen2024f5tts, leng2024fishspeech, zhou2025indextts2}}，但兩者各具其侷限性：
+
+\begin{itemize}
+    \item 語者自適應（Speaker Adaptation）：此方法透過少量樣本微調預訓練的多語者 TTS 模型。雖然音質通常較優，但高品質的適應往往需要數千次的微調步驟，這導致了極大的計算資源消耗與時間成本（可能長達數分鐘甚至數小時）。為了改善此效率問題並降低訓練成本，後續研究如 Meta-TTS \cite{huang2022metatts} 結合了元學習（Meta-Learning）技術以實現少樣本學習（Few-shot）。元學習的核心概念在於「學習如何學習（Learn to learn）」，旨在讓模型獲得快速適應新任務的元知識，使其僅需極少量的樣本即可迅速收斂，達成高效的語者適應。
+    \item 語者編碼（Speaker Encoding）：{\color{red}此方法透過在大規模多語者資料集上預訓練的語者編碼器，將輸入參照語音映射為單一語者嵌入向量（Speaker Embedding）}。其最顯著的優點在於不需重新進行任何微調步驟，即可進行語音複製，實現了零樣本學習（Zero-shot），因此能提供最快的複製速度。然而，其效能高度受限於模型訓練時見過的語者資訊，當面對訓練集之外的陌生語者時，常會因為泛化落差（Generalization Gap）而導致合成聲音的相似度不如預期。
+\end{itemize}
+
+{\color{gray}
+針對生成效果的評鑑，客觀指標常採用詞錯率（WER, Word Error Rate），藉由自動語音識別（ASR, Automatic Speech Recognition）技術量測合成內容與原始文本的一致性。主觀評價則依賴平均意見分數（MOS, Mean Opinion Score），由受測者針對自然度進行 1 至 5 分的評比，其中 1 分為最不自然，5 分則最接近真人。此外，為精確衡量特定聲學面向，亦採用語者相似度（SMOS, Similarity MOS）、韻律（PMOS, Prosody MOS）、音訊品質（QMOS, Quality MOS）、情緒保真度（EMOS, Emotion MOS）等衍生指標，達成對合成語音感知品質的量化。
+}
+
+{\color{red}
+針對語音生成效果的評鑑，常使用主觀指標平均意見分數（MOS, Mean Opinion Score），由受測者針對自然度進行 1 至 5 分的評比，其中 1 分為最不自然，5 分則最接近真人。此外，為精確衡量特定聲學面向，亦採用語者相似度（SMOS, Similarity MOS）、韻律（PMOS, Prosody MOS）、音訊品質（QMOS, Quality MOS）、情緒保真度（EMOS, Emotion MOS）等衍生指標。在客觀評鑑方面，近期語音合成研究普遍採用詞錯率（WER, Word Error Rate）與語者相似度（Speaker Similarity, SS）作為主要指標。得益於自動語音識別（ASR）技術的突破，如 Whisper 與 FunASR 等模型已具備接近人類的辨識水準，大幅提升了 WER 自動化評測的可信度。而在語者相似度方面，則多利用語者確認模型（Speaker Verification Models） 提取語音表徵（Representations），並計算合成語音與參考音訊之間的餘弦相似度（Cosine Similarity），以精確量化兩者在聲學特徵上的吻合程度。
+}
+
+以下將會介紹在三種種類 TTS 中經典做法：{\color{red}採端對端架構且針對單一語者訓練的 Tacotron} \cite{wang2017tacotron}、結合 Meta-Learning 做在語者自適應 Few-shot TTS 的 Meta-TTS \cite{huang2022metatts}、以及結合大語言模型語者編碼 Zero-shot TTS 的 IndexTTS2 \cite{zhou2025indextts2}。
+
+\subsection{Tacotron}
+
+
+Tacotron 由 Google 的研究人員開發，是一種基於序列到序列（seq2seq）\cite{sutskever2014seq2seq}的注意力機制架構，可直接從字元合成語音。如圖\ref{fig:tacotron_model_arch}所示，該模型的核心架構由編碼器、解碼器與後處理網路組成。{\color{red} 編碼器的處理流程始於字元嵌入，隨即進入 Pre-net 模組。Pre-net 由帶有 Dropout 的全連接層組成，作為瓶頸層（Bottleneck Layer）以促進收斂並提升泛化能力。經過 Pre-net 處理後的特徵隨即輸入至 CBHG 模組，該模組依序結合了一維卷積濾波器組（1-D Convolutional Bank）、高速公路網路（Highway Networks）\cite{srivastava2015highway} 與雙向閘控循環單元（bidirectional gated recurrent unit (GRU)\cite{chung2014empirical}）。此設計旨在捕捉類似 N-gram 的局部特徵以及全域的雙向上下文資訊。隨後的解碼階段採用內容導向的 tanh 注意力機制，並透過縮減因子（Reduction Factor）在每個時間步預測多個頻譜幀。}
+
+在特徵生成與音訊重建方面，解碼器輸出的 80 階梅爾頻譜圖會經由後處理網路進一步轉化為線性頻率規模頻譜圖。此階段再次運用 CBHG 模組的雙向處理能力，修正幀級別的預測誤差，強化諧波結構。最終，該系統採用 Griffin-Lim 演算法從線性頻譜圖中合成音訊波形。實驗數據顯示，在美國英語的平均意見分數（MOS）測試中，此模型獲得 3.82 的評分，超越了傳統的生產級參數化合成系統。此外，由於該模型是在幀級別而非樣本級別生成語音，其推理速度明顯優於如 WaveNet 等自迴歸模型。
+
+訓練過程中，該架構直接在文字與音訊配對的原始資料上運行，無需人工標註音素級別的對齊。損失函數採用對解碼器與後處理網路輸出的 L1 損失進行同等加權計算，並透過 Adam 優化器進行訓練。研究指出，Pre-net 中的 Dropout 對於模型在缺乏計畫採樣（Scheduled Sampling）的情況下達成泛化至關重要。消歧義實驗證實，若缺乏 CBHG 或後處理網路，模型的對齊能力與音質解析度將顯著下降。該研究為端對端語音合成奠定了基礎，展現了簡化流水線在應對真實世界噪音數據與適應多樣語音屬性方面的潛力。
+
+評估語音合成的自然度，作者進行了 MOS 測試，測試母語者對 100 個未再訓練中見過的短語，每個短語收集 8 個評分，並且在計算 MOS 時僅計入使用耳機的評分數據。實驗將 Tacotron 與基於 LSTM 的參數式系統（Parametric）\cite{zen2016fast} 以及拼接式系統（Concatenative）\cite{gonzalvo2016recent} 比較。如表\ref{tab:mos_results} 所示，Tacotron 達到了 3.82 的 MOS 分數，成功超越了參數式系統。
+
+\begin{figure}[H]
+  \centering
+  % 左側：上方放圖片，下方放 MOS 表格
+  \begin{minipage}[b]{0.45\textwidth}
+    \centering
+    % 放置 Tacotron 架構圖
+    \includegraphics[width=\textwidth]{images/tacotron_model_arch.png}
+    \caption{Tacotron 模型架構圖\cite{wang2017tacotron}}
+    \label{fig:tacotron_model_arch}
+    
+    \vspace{1em} % 圖與表之間的間距
+    
+    % 放置 MOS 評估表格
+    \scriptsize % 縮小字體以符合寬度
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{系統} & \textbf{MOS} \\
+        \hline
+        Tacotron & $3.82 \pm 0.085$ \\
+        參數式 (Parametric)\cite{zen2016fast} & $3.69 \pm 0.109$ \\
+        拼接式 (Concatenative)\cite{gonzalvo2016recent} & $4.09 \pm 0.119$ \\
+        \hline
+    \end{tabular}
+    \captionof{table}{5 分制平均意見分數 (MOS) 評估\cite{wang2017tacotron}}
+    \label{tab:mos_results}
+  \end{minipage}
+  \hfill
+  % 右側：放詳細的超參數表格
+  \begin{minipage}[H]{0.5\textwidth}
+    \centering
+    \setlength{\tabcolsep}{2pt}
+    \scriptsize % 使用 tiny 字體以確保高度與左側相近
+    \begin{tabular}{|l|l|}
+    \hline
+    Spectral analysis & \emph{pre-emphasis}: 0.97; \emph{frame length}: 50 ms; \\
+                      & \emph{frame shift}: 12.5 ms; \emph{window type}: Hann \\ \hline
+    Char embedding    & 256-D \\ \hline
+    Encoder CBHG      & \emph{Conv1D bank}: $K$=16, conv-$k$-128-ReLU \\
+                      & \emph{Max pooling}: stride=1, width=2 \\
+                      & \emph{Conv1D projections}: conv-3-128-ReLU \\
+                      & $\rightarrow$ conv-3-128-Linear \\
+                      & \emph{Highway net}: 4 layers of FC-128-ReLU \\
+                      & \emph{Bidirectional GRU}: 128 cells \\ \hline
+    Encoder pre-net   & FC-256-ReLU $\rightarrow$ Dropout(0.5) $\rightarrow$ \\
+                      & FC-128-ReLU $\rightarrow$ Dropout(0.5) \\ \hline
+    Decoder pre-net   & FC-256-ReLU $\rightarrow$ Dropout(0.5) $\rightarrow$ \\
+                      & FC-128-ReLU $\rightarrow$ Dropout(0.5) \\ \hline
+    Decoder RNN       & 2-layer residual GRU (256 cells) \\ \hline
+    Attention RNN     & 1-layer GRU (256 cells) \\ \hline
+    Post-processing   & \emph{Conv1D bank}: $K$=8, conv-k-128-ReLU \\
+    CBHG              & \emph{Max pooling}: stride=1, width=2 \\
+                      & \emph{Conv1D projections}: conv-3-256-ReLU \\
+                      & $\rightarrow$ conv-3-80-Linear \\
+                      & \emph{Highway net}: 4 layers of FC-128-ReLU \\
+                      & \emph{Bidirectional GRU}: 128 cells \\ \hline
+    Reduc. factor ($r$) & 2 \\ \hline
+    \end{tabular}
+    \captionof{table}{Tacotron 超參數與網路架構\cite{wang2017tacotron}}
+    \label{tb.params}
+  \end{minipage}
+\end{figure}
+
+\clearpage
+
+\subsection{Meta-TTS}
+
+Meta-TTS 旨在解決傳統文字轉語音模型在適應新說話者時，往往需要大量數據與訓練步驟的挑戰。傳統微調方法通常需要數千步才能獲得高品質結果，不僅速度較慢且容易產生過擬合現象。為了實現少樣本語音複製並加速適應過程，該研究提出了 Meta-TTS 架構，將「與模型無關的元學習算法（MAML）\cite{finn2017maml}」應用於非自回歸模型 FastSpeech 2 之上。透過此結合，模型能學習到一組具備快速適應能力的元初始化參數，使其在面對未見過的新說話者時，僅需極少量的樣本與幾次梯度下降步驟，即可達到良好的合成效能。本節後續將首先闡述其基底架構 FastSpeech 2 的運作原理，接著詳述元學習演算法如何整合應用於該模型之中。
+
+FastSpeech 2 \cite{ren2021fastspeech}為一種非自回歸的文字轉語音模型，主要由編碼器（Encoder）、變異適配器（Variance Adapter）與梅爾頻譜解碼器（Mel-spectrogram Decoder）組成。編碼器由 Transformer 層堆疊而成，負責將音素嵌入序列轉換為隱藏序列以提取上下文；變異適配器負責加入時長、音高與能量等資訊以決定語速與語調；解碼器則將適配後的序列並行轉換為決定音色的梅爾頻譜序列。在多語者版本中，模型將目標語者的嵌入向量（Speaker Embedding）加入變異適配器與解碼器的輸入作為條件，使這兩個模組能根據特定特徵進行生成，而編碼器因僅處理文本內容故不加入說話者資訊。當針對新說話者進行微調時，流程通常會固定編碼器參數，僅利用少量樣本微調語者嵌入以及變異適配器與解碼器，以適應新的聲音特徵。
+
+由於多語者語音合成系統可視為單一語者合成的多任務版本，因此可透過微調將預訓練的多語者模型適應至新說話者。在語者自適應方法中，常見的微調策略主要有兩種：一是僅微調語者嵌入 $\{E_S\}$，二是微調整個模型 $\{\bm{\theta}_E, \bm{\theta}_{VA}, \bm{\theta}_D, E_S\}$。然而，由於原始的語者嵌入查找表 $E_S$ 僅包含訓練集中的說話者資訊，對於測試集中的每位新說話者 $i$，必須初始化一個新的嵌入表 $\hat{E}_S$ 以獲得對應的嵌入向量 $\hat{e}_i$。此外，鑑於編碼器 $\bm{\theta}_E$ 不應受說話者身分制約，微調階段通常不會對其進行更新。綜合考量下，該研究的實驗主要聚焦於同時微調變異適配器、解碼器與新語者嵌入 $\{\bm{\theta}_{VA}, \bm{\theta}_D, \hat{E}_S\}$，以在適應效率與模型效能間取得平衡。
+
+元學習（Meta-learning）又被稱為「學習如何學習（learn to learn）」，其目標在於設計出能利用少量訓練樣本快速適應新環境或學習新技能的模型，因此極為適合應用於少樣本下游任務。與傳統監督式學習針對單一資料集進行擬合不同，元學習係透過在訓練任務集上的擬合，學習出一組良好的模型元初始化參數（Meta-initialization），以利於後續的遷移學習。該研究選用 MAML\cite{finn2017maml} 演算法作為核心，並針對語音合成特性進行了架構調整。具體而言，該研究參考了「幾乎無內迴圈」（Almost No Inner Loop, ANIL）\cite{Raghu2020anil}的概念，但其基本理念有所不同。ANIL 基於特徵重用（Feature Reuse）的觀察，僅在內迴圈更新最後一層參數；然而，該研究指出在 Meta-TTS 中並未觀察到顯著的特徵重用現象，而是根據模組職責進行區分。鑑於變異適配器、解碼器與語者嵌入對說話者適應的影響較為顯著，該研究設計在內迴圈中僅針對這些與說話者高度相關的模組進行梯度更新，而固定編碼器參數，隨後在外迴圈中才對整體模型進行元更新。
+
+圖 \ref{fig:metatts_model} 該圖左半部表示內迴圈之前的初始模型參數 $\theta$，而右半部則表示經過內迴圈梯度下降後的自適應模型參數 $\theta_i$。圖中紅色虛線箭頭與紅色方塊明確標示出哪些參數（即變異適配器、解碼器與語者嵌入）在內迴圈過程中進行了更新。在完成內迴圈適應後，系統將查詢集的輸入資料前饋至右側已適應的模型中，並計算其輸出損失作為該元任務的損失。最終，該損失將依循綠色虛線箭頭的路徑，從圖的右上角反向傳播回圖左半部的初始模型參數，以完成外迴圈的參數優化。
+
+為了驗證 Meta-TTS 在少樣本語者適應任務上的有效性，該研究使用了 LibriTTS 的 train-clean-100 子集進行模型訓練，並在 LibriTTS test-clean 與 VCTK 資料集上進行測試。實驗中的基準模型（Baseline）指未經元學習訓練、僅透過傳統微調進行適應的多語者 FastSpeech 2 模型。在主觀評估方面，實驗集中於 10 個適應步驟（Adaptation steps）的情境下測量相似度平均意見分數（SMOS）。實驗中使用該聲碼器將真實梅爾頻譜圖轉換為參考基線（稱為重構語音），並將其評測結果視為合成語音相似度的理論上限。表 \ref{tab:speaker_similarity} 的結果顯示，無論是在同源的 LibriTTS 或跨源的 VCTK 測試中，Meta-TTS 的表現皆顯著優於基準模型，SMOS 分數差距超過 1 分。在客觀評估方面，圖 \ref{fig:adaptation_steps} 展示了不同適應步驟下的餘弦相似度矩陣。觀察矩陣變化可知，基準模型約需 50 個適應步驟才能顯現出與目標語者相似的對角線模式，而 Meta-TTS 僅需 5 至 10 個步驟即可達到同等清晰度，證實其在極少量的更新步驟下即可快速生成高相似度的目標語音。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/metatts-model-arch.png} 
+    \caption{Meta-TTS 訓練 MAML 流程圖\cite{huang2022metatts}}
+    \label{fig:metatts_model}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\textwidth]{images/MetaTTS_exp_adapt.png}
+    \caption{不同適應步驟下的餘弦相似度矩陣\cite{huang2022metatts}}
+    \label{fig:adaptation_steps}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{llcccc}
+        \toprule
+        \multirow{2}{*}{Approach} & \multirow{2}{*}{Adaptation} & \multicolumn{2}{c}{LibriTTS} & \multicolumn{2}{c}{VCTK} \\
+        \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+         & & Emb table $\hat{E}_S$ & Shared $e_S$ & Emb table $\hat{E}_S$ & Shared $e_S$ \\
+        \midrule
+        Real & & \multicolumn{2}{c}{$4.29 \pm 0.27$} & \multicolumn{2}{c}{$4.54 \pm 0.09$} \\
+        Reconstructed & & \multicolumn{2}{c}{$3.33 \pm 0.29$} & \multicolumn{2}{c}{$4.08 \pm 0.12$} \\
+        \midrule
+        Baseline & 10 steps & $1.53 \pm 0.18$ & $1.34 \pm 0.21$ & $1.56 \pm 0.12$ & $1.32 \pm 0.13$ \\
+        Meta-TTS & 10 steps & $\mathbf{2.77 \pm 0.24}$ & $\mathbf{2.67 \pm 0.28}$ & $\mathbf{3.14 \pm 0.16}$ & $\mathbf{3.45 \pm 0.14}$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{以相似度平均意見分數 (SMOS) 評估之語者相似度（95\% 信賴區間）\cite{zhou2025indextts2}}
+    \label{tab:speaker_similarity}
+\end{table}
+
+\subsection{IndexTTS2}
+
+IndexTTS2 是由 bilibili 人工智慧平台部門提出的一種大型自回歸零樣本語音合成模型。當前語音合成技術已顯著轉向以大型語言模型（LLM）驅動的開發路徑，隨著如 XTTS \cite{casanova2024xtts}、F5-TTS \cite{chen2024f5tts} 與 Fish-Speech \cite{leng2024fishspeech} 等系統透過ㄉ大量語音記號（speech tokens）與大規模數據訓練，系統得以在複雜的潛在空間（Latent space）中穩健捕捉音色（Timbre）與韻律（Prosody）。此類進展有效解決了以往編碼器面對陌生講者時相似度不足的痛點。IndexTTS2 的核心創新在於解決了自回歸（AR）模型對時間掌控的困難，提出了一種既能精確控制時長，又能將語者身分與情感表達獨立控制的架構。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_model_structure.png}
+    \caption{IndexTTS2 模型架構圖\cite{zhou2025indextts2}}
+    \label{fig:model_structure}
+\end{figure}
+
+該模型採用級聯式架構，由文字轉語意（Text-to-Semantic, T2S）、語意轉梅爾頻譜（Semantic-to-Mel, S2M）以及聲碼器（Vocoder）三個核心模塊組成。T2S 模塊負責從文本生成語意記號，S2M 模塊將這些記號轉換為梅爾頻譜圖，最後由 BigVGANv2 聲碼器將頻譜圖轉換為音訊波形。為了增強情緒表達的穩定性與清晰度，該研究設計了一種三階段訓練策略。第一階段使用全量數據訓練基礎模型並隨機歸零時長嵌入以支援自由生成；第二階段引入梯度反轉層（GRL, Gradient Reversal Layer）\cite{yaroslav2016GRL}與情緒適配器，專注於情緒特徵與語者特徵的解耦；第三階段則凍結所有特徵調節器，對全模型進行微調以提升魯棒性。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_T2S.png}
+    \caption{IndexTTS2 T2S 模塊架構圖\cite{zhou2025indextts2}}
+    \label{fig:t2s_structure}
+\end{figure}
+
+在文字轉語意（T2S）模塊中，模型採用自回歸 Transformer 架構，其輸入序列定義為 $[c, p, e_{\langle BT\rangle}, E_{text}, e_{\langle BA\rangle}, E_{sem}]$，其中 $c$ 代表語者屬性，$p$ 為時長控制嵌入，$E_{text}$ 與 $E_{sem}$ 分別為文本與語意記號的嵌入向量。為了降低情緒控制的門檻，該研究引入了文字轉情緒（Text-to-Emotion, T2E）模塊，利用知識蒸餾技術將 Deepseek-r1 的推論能力轉移至參數量較小的 Qwen-3-1.7b 模型。該模塊能將自然語言描述映射為情緒機率分布，進而生成情緒向量 $e$ 供 T2S 使用。在時長控制方面，透過約束時長嵌入表 $W_{num}$ 與語意位置嵌入表 $W_{sem}$ 相等（即 $W_{sem}=W_{num}$），模型能精確將位置資訊與目標時長 $T$ 對齊。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{IndexTTS2_S2M.png}
+    \caption{IndexTTS2 S2M 模塊架構圖\cite{zhou2025indextts2}}
+    \label{fig:s2m_structure}
+\end{figure}
+
+語意轉梅爾頻譜（S2M）模塊則採用基於流匹配（Flow Matching）的非自回歸架構，該架構通過學習常微分方程（ODE）將雜訊分布映射至目標梅爾頻譜。研究團隊發現，在合成高強度的情緒語音時，僅依賴語意記號可能導致發音含糊不清（slurring）的問題。為解決此問題，該模塊引入了 GPT 隱含特徵增強機制，將 T2S 模塊最後一層 Transformer 的輸出 $H_{GPT}$ 與語意特徵進行融合。由於 $H_{GPT}$ 包含豐富的文本與上下文資訊，這種融合顯著提升了情緒表達下的語音清晰度與穩定性。
+
+為了驗證 IndexTTS2 的效能，該研究在 LibriSpeech test-clean 等公開資料集上進行了評估，並與 MaskGCT、F5-TTS、CosyVoice2、SparkTTS、IndexTTS 等先進的零樣本學習基準模型進行對比。實驗結果顯示（如表 \ref{tab:indextts2_perf}），IndexTTS2 在語者相似度（SS）等客觀指標上達到了 0.870，而在 LibriSpeech 測試集的主觀聽測實驗（MOS）中，IndexTTS2 的表現均優於其他所有基準模型。消融實驗進一步證實，若移除 GPT 隱含特徵增強，字錯率（WER）將從 3.115\% 上升至 3.334\%，顯示該機制對維持發音清晰度的重要性。
+
+\begin{table}[H]
+\centering
+\caption{IndexTTS2 與其他基準模型在 LibriSpeech test-clean 資料集上的效能比較\cite{zhou2025indextts2}}
+\label{tab:indextts2_perf}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lccccc}
+\hline
+\textbf{Model} & \textbf{SS} $\uparrow$ & \textbf{WER (\%)} $\downarrow$ & \textbf{SMOS} $\uparrow$ & \textbf{PMOS} $\uparrow$ & \textbf{QMOS} $\uparrow$ \\
+\hline
+Ground Truth & 0.833 & 3.405 & $4.02 \pm 0.22$ & $3.85 \pm 0.26$ & $4.23 \pm 0.12$ \\
+MaskGCT      & 0.790 & 7.759 & $4.12 \pm 0.09$ & $3.98 \pm 0.11$ & $4.19 \pm 0.19$ \\
+F5-TTS       & 0.821 & 8.044 & $4.08 \pm 0.21$ & $3.73 \pm 0.27$ & $4.12 \pm 0.13$ \\
+CosyVoice2   & 0.843 & 5.999 & $4.02 \pm 0.22$ & $4.04 \pm 0.28$ & $4.17 \pm 0.25$ \\
+SparkTTS     & 0.756 & 8.843 & $4.06 \pm 0.20$ & $3.94 \pm 0.21$ & $4.15 \pm 0.16$ \\
+IndexTTS     & 0.819 & 3.436 & $4.23 \pm 0.14$ & $4.02 \pm 0.18$ & $4.29 \pm 0.22$ \\
+\textbf{IndexTTS2} & 0.870 & \textbf{3.115} & \textbf{4.44 $\pm$ 0.12} & \textbf{4.12 $\pm$ 0.17} & \textbf{4.29 $\pm$ 0.14} \\
+\hline
+- GPT latent & \textbf{0.887} & 3.334 & $4.33 \pm 0.10$ & $4.10 \pm 0.12$ & $4.17 \pm 0.22$ \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+
+
+\section{深偽語音偵測技術與代表性模型}
+
+隨著語音合成技術的迭代，偽造語音的逼真程度已達肉耳難辨之境。為了應對日益嚴峻的資安威脅，深偽語音偵測（Deepfake Speech Detection）技術也發展出了各式的防禦架構。本節將探討目前偵測技術的兩大主流發展範式：其一為傳統的「預訓練—微調（Pre-train, Fine-tune）」範式；其二則是新興的「提示學習（Prompting）」範式。我們將分別回顧這兩種範式下的代表性模型。
+
+\subsection{「預訓練—微調」範式下之代表性模型}
+
+在此範式下，普遍以透過在大規模資料配合自監督學習（Self-Supervised Learning, SSL）方式預訓練的模型作為前端特徵提取器，並串接為特定下游任務設計的後端網路，最終在整體上進行參數微調。此範式在各式下游任務上建立了極高的性能標竿，但伴隨著需要龐大存儲空間以及算力資源的短板。以下將詳細介紹兩個在防偽偵測上極具代表性的架構：基於圖神經網路的 AASIST，以及基於 Conformer 架構與多尺度特徵融合的 MFA-Conformer。
+
+\subsubsection{SSL-AASIST 模型}
+
+AASIST架構是由Tak et al. (2022)所提出的，在ASVspoof21 LA挑戰中取得優異的成績。該作者在後續研究中將前端模型替換為wav2vec 2.0 XLSR並加上Rawboost Data Augmentation後被視為語音深偽偵測任務的SOTA模型。(許多後續研究以及挑戰基於此模型進行改進語比較，足見此架構之經典)
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth]{images/AASIST_model.png}
+    \caption{AASIST 模型架構圖}
+\end{figure}
+
+該模型的運作流程如下（架構如圖X所示）：
+\begin{enumerate}
+    \item \textbf{前端特徵提取}：使用預訓練的 \textbf{wav2vec 2.0} 模型對原始音波進行處理。由於 wav2vec 2.0 在大量語音數據上進行了自監督訓練，其提取的特徵具備高度的泛化能力與豐富的聲學細節。
+    \item \textbf{深層編碼}：將前端輸出輸入至基於 \textbf{RawNet2} 的殘差編碼器，進一步學習深層的聲學特徵。
+    \item \textbf{特徵聚合與圖建模}：透過基於自注意力的聚合層，分別提取\textbf{頻譜（Spectral）}和\textbf{時序（Temporal）}兩種維度的特徵。這兩組特徵隨後各自通過由圖注意網路（GAT）和圖池化（Graph Pooling）組成的圖模塊。
+    \item \textbf{異質圖融合}：利用圖結合技術，將頻譜與時序特徵融合為\textbf{異質譜時圖（Heterogeneous Spectro-Temporal Graph）}。隨後，特徵被送入由 **HS-GAL（Heterogeneous Stacking Graph Attention Layer）** 組成的 **MGO（Max Graph Operation）** 模塊，以捕捉跨域的偽造痕跡。
+    \item \textbf{分類決策}：最後，將 MGO 產出的兩組節點堆疊並最大化，通過各節點的最大化和平均運算後串接隱藏全連接層，輸出真偽標籤。
+\end{enumerate}
+
+此架構透過全參數微調（Full Fine-tuning）wav2vec 2.0 前端與 AASIST 後端，在 \textbf{ASVspoof 2021} 評測中取得了優異成績，成為該挑戰下的里程碑。此模型的一個主要特徵是其前端模型 wav2vec 2.0 XLS-R 本身擁有約 317M 的巨大參數量，因此在面對未見過的攻擊類型或跨資料集測試（如 ASVspoof 2021 DeepFake 數據集）時，展現了傑出的泛化能力。然而，這也意味著其訓練與推論都需要龐大的計算資源與記憶體空間。
+
+\subsubsection{MFA-Conformer (Conformer with Transfer Learning)}
+
+另一個值得關注的 SOTA 模型是 MFA-Conformer，該架構由 Zhang 等人（2022）首先應用於聲紋識別（ASV），隨後被證實同樣適用於偽造語音偵測。Conformer 區塊（Conformer Block）的設計初衷在於解決 Transformer 雖擅長捕捉長距離全域依賴（Global Context），卻在提取細微局部特徵（Local Features）上不如卷積神經網路（CNN）的問題。Conformer 透過將卷積模組（Convolution Module）嵌入 Transformer 的自注意力機制與前饋網路之間，成功結合了 CNN 的局部感知能力與 Transformer 的全域建模能力。此架構的優勢最早由 Gulati 等人（2020）\cite{gulati2020conformer} 在自動語音識別（ASR）任務中獲得證實：實驗顯示，在 LibriSpeech 基準測試上，Conformer 能以僅 Transformer 四分之一不到的參數量，達到更優異的辨識率（WER）。MFA-Conformer 在『參數效率（Parameter Efficiency）』上所展現的潛力，不僅證實了輕量化設計的可行性，更為本文後續進行跨範式（Cross-paradigm）的模型效能評比，提供了極具代表性的對照組。
+
+(該說一下Conformer block的數學或是放一張Conformer block圖)
+% --- [圖片插入說明] 圖五 ---
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth]{images/MFA-Conformer_model.png}
+    \caption{MFA-Conformer 模型架構圖}
+\end{figure}
+
+
+  % \item \textbf{遷移學習 (Transfer Learning)}： (移至實驗說明)
+  % 該模型並非從頭訓練，而是利用了在 **NeMo** 工具包提供的 ASR 模型（NEMO STT En Conformer-CTC Small）上訓練的權重進行初始化。該模型是在包含數千小時英語語音的複合資料集上訓練而成。
+
+為了有效捕捉不同層級的特徵，此模型利用多尺度特徵聚合 (MFA) 與池化機制將所有 Conformer 區塊的輸出進行融合，而非僅使用最後一層。其具體運作流程與 ASP 數學定義如下：
+
+\textbf{第一步：特徵拼接與正規化}：
+假設模型共有 $L$ 個 Conformer 區塊（本研究中 $L=16$），第 $i$ 層的輸出特徵序列為 $H_i$。首先，將每一個 Conformer 區塊的輸出在特徵維度上進行拼接（Concatenation），並通過層正規化（Layer Normalization）：
+\begin{equation}
+H_{concat} = \text{LayerNorm}(\text{Concat}(H_1, H_2, ..., H_L))
+\end{equation}
+
+\textbf{第二步：注意力統計池化 (Attentive Statistic Pooling, ASP)}：
+為了從變長的語音序列中提取固定維度的嵌入向量（Embedding），拼接後的特徵 $H_{concat}$ 會輸入至 ASP 層。假設 $h_t$ 為 $H_{concat}$ 在時間步 $t$ 的特徵向量，ASP 首先透過注意力機制計算每個時間步的權重 $\alpha_t$：
+
+\begin{equation}
+e_t = v^T \tanh(W h_t + b)
+\end{equation}
+\begin{equation}
+\alpha_t = \frac{\exp(e_t)}{\sum_{\tau} \exp(e_\tau)}
+\end{equation}
+
+其中 $W$ 與 $b$ 為可學習的權重與偏差，$v^T$ 為投影向量。接著，利用權重 $\alpha_t$ 計算加權平均數（Weighted Mean, $\tilde{\mu}$）與加權標準差（Weighted Standard Deviation, $\tilde{\sigma}$）：
+
+\begin{equation}
+\tilde{\mu} = \sum_{t} \alpha_t h_t
+\end{equation}
+\begin{equation}
+\tilde{\sigma} = \sqrt{\sum_{t} \alpha_t (h_t - \tilde{\mu})^2}
+\end{equation}
+
+最後，將統計量 $\tilde{\mu}$ 與 $\tilde{\sigma}$ 進行拼接，作為最終的語句層級特徵向量 $H_{MFA}$，再經由 Batch Norm 與線性層進行真偽分類：
+\begin{equation}
+H_{MFA} = \text{Concat}(\tilde{\mu}, \tilde{\sigma})
+\end{equation}
+
+
+\subsection{基於提示學習之防禦範式 (Prompting Paradigm)}
+
+隨著大規模預訓練模型在語音領域的廣泛應用，傳統的「預訓練—微調（Pre-train, Fine-tune）」範式面臨了嚴重的擴展性挑戰。在此範式下，模型首先在海量無標註數據上進行預訓練以學習通用表徵，隨後針對特定下游任務，需更新並儲存模型內部的全部或大部分參數。然而，隨著模型參數規模邁入數億級甚至更大的量級，為每個任務維護獨立的模型副本，在存儲空間與計算資源上均造成了沉重負擔。
+
+為了解決此問題，Chang 等人 (2023, 2024) 借鑑了自然語言處理 (NLP) 領域的技術，提出了一種基於提示學習（Prompting）範式的參數高效（Parameter-Efficient）\textbf{SpeechPrompt} 架構。該架構的核心在於凍結預訓練語音語言模型的參數，僅透過插入少量可學習的提示向量（Prompt Vectors），將各類語音任務統一重塑為「語音到單元生成（Speech-to-Unit Generation）」任務，從而實現高效的跨任務遷移。下節將介紹 SpeechPrompt 所基於的核心技術：生成式語音語言模型 GSLM，並在後續章節介紹SpeechPrompt的實踐方法。
+
+\subsubsection{GSLM (Generative Spoken Language Model)}
+傳統語音處理模型往往依賴大量標註數據，然而 Lakhotia 等人（2021）提出的 GSLM 旨在模擬人類早期的語言習得過程，僅透過原始音訊輸入即可學習聲學與語言特徵，實現無文本的自然語言處理（Textless NLP）。
+
+GSLM 的核心概念是將連續的語音波形離散化，並在此基礎上訓練語言模型。其標準流程包含三個階段：
+
+\begin{enumerate}
+    \item \textbf{Speech-to-Unit (S2u)}：利用預訓練的自監督模型（Self-Supervised Learning, SSL）提取語音特徵，並透過 K-means 分群將連續特徵向量量化為離散單元序列（Discrete Units）。
+    \item \textbf{Unit-based Language Model (uLM)}：在離散單元上訓練 Transformer Decoder，學習單元間的機率分佈。
+    \item \textbf{Unit-to-Speech (u2S)}：將生成的單元序列輸入解碼器，轉回連續的語音波形。
+\end{enumerate}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/GSLM_model.png}
+    \caption{GSLM 架構圖}
+\end{figure}
+
+GSLM 的語言模型（uLM）採用標準的 Transformer 架構，並以自回歸（Autoregressive）方式進行預訓練。其訓練目標是最大化下一個離散單元的對數似然函數（Log-Likelihood）。
+
+假設一段語音被編碼為長度為 $T$ 的離散單元序列 $u = (u_1, u_2, ..., u_T)$，則模型的訓練損失函數 $\mathcal{L}$ 定義為：
+
+\begin{equation}
+\mathcal{L} = - \sum_{t=1}^{T} \log P(u_t | u_{<t}; \theta)
+\end{equation}
+
+其中 $u_{<t}$ 表示當前時刻之前的所有單元 $(u_1, ..., u_{t-1})$，$\theta$ 為模型參數。透過最小化此損失函數，模型能夠捕捉語音中長距離的依賴關係與語法結構，建立語言的機率模型。
+
+在訓練數據方面，Lakhotia 等人（2021）使用了 \textbf{LibriLight} 資料集中的 6k 小時無標註「乾淨（clean）」語音進行訓練。這證實了 GSLM 具備從大規模原始音訊中歸納高階語言知識的能力，而無需依賴任何人工轉寫的文本資源。
+
+GSLM 的生成品質高度依賴於前端 S2u 編碼器的特徵提取能力。Lakhotia 等人（2021）系統性地比較了 CPC、wav2vec 2.0 與 HuBERT 三種主流的自監督模型。研究發現，不同的編碼器對下游生成的影響顯著不同。其中，\textbf{HuBERT} 在語音重合成（Resynthesis）與生成（Generation）的各項客觀指標（如 Perplexity）與主觀指標（如人類聽測 MOS）上，往往能取得較佳的平衡，特別是在捕捉語音內容（Content）方面表現穩健。基於文獻中的發現，後續的相關研究（如 SpeechPrompt）傾向於選擇 HuBERT 作為默認的特徵提取器。
+
+
+\subsubsection{SpeechPrompt 架構}
+
+SpeechPrompt的核心概念是將預訓練的語音語言模型（如 GSLM）視為凍結 (Frozen) 的黑盒，僅透過在輸入端或模型內部層級中注入極少量（通常小於總量 0.1\%）的可學習「提示向量 (Prompt Vectors)」，來引導 (Prompting) 模型利用其預訓練所獲得的知識來處理多樣化的下游任務。
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/SpeechPrompt_model.png}
+    \caption{SpeechPrompt 模型架構圖}
+\end{figure}
+
+為了更清晰地闡述 SpeechPrompt 的運作機制，我們將架構圖中的關鍵模組進行細部分解與定義。這些模組共同協作，將輸入語音轉換為下游任務的預測結果：
+
+\begin{itemize}
+    \item \textbf{SSL Quantizer (自監督語音量化器)}：
+    作為系統的輸入前端，此模組負責將連續的語音波形轉換為離散單元序列（Token Sequence）。如 2.1.3 節所述，本研究考量其特徵提取的穩健性，選用預訓練的 \textbf{HuBERT} 模型提取特徵，並透過 K-means 演算法進行量化。這一步驟是將連續訊號「語言化」的關鍵。
+    
+    \item \textbf{Prompt Vectors (提示向量)}：
+    這是 SpeechPrompt 架構中核心的可訓練參數，負責攜帶任務特定的指令資訊。其主要包含前置於輸入層的 Input Prompts 以及嵌入於模型內部的 Deep Prompts。關於這些向量的具體數學定義、維度設定以及在 Attention 機制中的嵌入方式，我們將在 **2.2.3 節** 中進行詳細的形式化描述。
+    
+    \item \textbf{Frozen Unit-based Language Model (凍結的單元語言模型)}：
+    此為整體架構的骨幹（Backbone），以下將簡稱為 uLM，負責理解輸入的語音單元並生成上下文表示（Contextual Representations）。文獻中已探討了多種模型架構，如 GSLM、pGSLM 與 Unit mBART。本計畫選用 GSLM 作為骨幹。在 Prompt Tuning 過程中，uLM 的所有參數保持凍結（Frozen），僅負責推論。這保證了下游任務訓練不會發生「災難性遺忘（Catastrophic Forgetting）」，並大幅降低了運算成本。
+    
+    \item \textbf{Verbalizer (標籤映射器)}：
+    這是針對分類任務（如 ASVspoof）的關鍵組件，負責將語言模型輸出的高維度單元分佈（Vocabulary Distribution）映射到低維度的任務標籤空間（Label Space）。常見的選擇包括：
+    \begin{itemize}
+        \item \textbf{Fixed Verbalizer (固定映射)}：手動或隨機指定特定單元（Units）代表目標類別（例如指定單元 \#10 代表「真實語音」）。此方法高度依賴人工設計，且要求模型必須透過原有的 uLM 嵌入表（Embedding Table）精確輸出特定的任務標記（Tokens），在性能與靈活性上通常較為受限。
+        \item \textbf{Learnable Verbalizer (可學習映射)}：這是一個取代原有嵌入層映射的輕量級線性投影矩陣（Linear Projection），能自動學習並識別哪些單元組合最能代表特定的分類標籤。SpeechPrompt v2 的實驗證實，此方法在多數任務下皆能顯著提升分類的準確度。
+    \end{itemize}
+\end{itemize}
+
+SpeechPrompt 採用了結合 \textbf{Input Prompt Tuning} 與 \textbf{Deep Prompt Tuning} 的策略，在模型的不同層級注入資訊:
+
+\begin{itemize}
+
+\item \textbf{Input Prompt Tuning (輸入端提示微調)}
+
+最直觀的 Prompt 嵌入方式是在模型的輸入端加入可訓練的向量。假設輸入語音經過 S2u 編碼後的離散單元序列嵌入（Embedding）為 $E(u) = [e(u_1), e(u_2), ..., e(u_T)]$。我們定義一組可訓練的 Prompt 向量 $P^I = [p^I_1, p^I_2, ..., p^I_L]$，其中 $L$ 為 Prompt 的長度。
+
+在輸入層，我們將 Prompt 向量序列前置於語音單元序列之前，形成新的輸入序列 $X$：
+
+\begin{equation}
+X = \text{Concat}(P^I, E(u))
+\end{equation}
+
+透過此機制，模型在處理語音特徵序列之前，即受到任務特定參數的制約。這些前置向量提供了可學習的上下文資訊（Contextual Information），有效地調節模型對後續輸入的特徵提取與生成行為，使其適應特定的下游任務。
+
+\item \textbf{Deep Prompt Tuning (深層提示微調)}
+
+為了增強 Prompt 對模型的控制力，SpeechPrompt 進一步採用了 Deep Prompt Tuning 技術。不同於僅在輸入層加入 Prompt，此方法在 Transformer 的每一層 Attention 機制中都嵌入了可訓練的向量。
+
+假設 Transformer 第 $j$ 層的輸入為隱藏狀態 $h$，標準的 Self-Attention 機制計算如下：
+
+\begin{equation}
+Attn(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\end{equation}
+
+其中 $Q, K, V$ 分別為 Query, Key, Value 矩陣。在 Deep Prompt Tuning 中，我們引入兩組可訓練的 Prompt 向量 $P_K$ 與 $P_V$，並將其同樣前置於原始的 Key 和 Value 矩陣之前：
+
+\begin{equation}
+K' = \text{Concat}(P_K, h)W_K
+\end{equation}
+
+\begin{equation}
+V' = \text{Concat}(P_V, h)W_V
+\end{equation}
+
+透過這種方式，Prompt 向量 $P_K$ 與 $P_V$ 能夠直接影響每一層 Attention 的權重分佈與輸出值。這意味著我們僅需訓練極少量的參數（即 $P^I, P_K, P_V$），就能在不改變模型權重的情況下，有效地「重新程式化（Reprogramming）」模型的行為以適應下游任務。
+\end{itemize}
+
+SpeechPrompt 架構根據下游任務的性質，採用不同的訓練目標。針對語音分類任務（如 ASVspoof），模型輸出的離散單元機率分佈會通過 Learnable Verbalizer 投影到類別空間，並透過最小化交叉熵損失函數（Cross-Entropy Loss）來優化 Prompt 向量與 Verbalizer 參數：
+\begin{equation}
+\mathcal{L}_{CE} = - \sum_{c=1}^{C} y_c \log(\hat{y}_c)
+\end{equation}
+其中 $C$ 為類別總數。對於序列生成任務（如 ASR），模型則採用自回歸方式最大化目標序列的條件機率。其損失函數定義為：
+\begin{equation}
+\mathcal{L}_{Gen} = - \sum_{t=1}^{M} \log P(y_t | y_{<t}, X; \theta_{prompt})
+\end{equation}
+在此過程中，模型透過最大化似然函數學習如何根據 Prompt 上下文生成符合目標的單元序列。
+
+Chang 等人（2023, 2024）的研究展示了 SpeechPrompt 架構的廣泛適用性。除了本計畫關注的語音分類任務外，此架構亦透過將任務轉化為序列生成問題，成功應用於自動語音辨識 (ASR)、語音翻譯 (ST) 與語音延續 (Speech Continuation) 等生成式任務，證實了 Prompting 典範作為通用語音處理框架的靈活性與潛力。
+
+針對語音分類領域，Chang 等人（2023）在 SpeechPrompt v2 的研究中進行了廣泛評估。為了驗證此架構的潛力與適用邊界，我們引用其實驗數據（如圖三所示）進行詳細分析。
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth]{images/SpeechPrompt_result.png}
+    \caption{SpeechPrompt 在各式分類任務上的表現}
+\end{figure}
+
+根據圖三的實驗數據，我們可以將 SpeechPrompt v2 在不同任務上的表現歸納為三個層次，這證明了 SpeechPrompt 是一個具備高度前景的通用架構，但也存在特定的改進空間：
+
+\begin{enumerate}
+    \item \textbf{超越 SOTA (Outperform SOTA)}：
+    在某些任務中，SpeechPrompt 甚至擊敗了全參數微調的專用模型，展現了 GSLM 在語意理解上的強大優勢。
+    \begin{itemize}
+        \item \textbf{具體任務}：立陶宛語關鍵詞偵測 (Lithuanian SCR)、阿拉伯語關鍵詞偵測 (Arabic SCR)、以及諷刺偵測 (Sarcasm Detection)。
+        \item \textbf{意涵}：這顯示 GSLM 預訓練所學到的高階語言特徵，對於語意理解與低資源語言的適應性極佳。Prompting 技術能夠有效激發這些潛在知識，在少量數據下達成超越傳統方法的表現。
+    \end{itemize}
+
+    \item \textbf{比肩 SOTA (Competitive with SOTA)}：
+    在主流的標準數據集上，SpeechPrompt 僅需訓練極少量的參數（通常小於模型總參數的 0.1\%），即可達到與訓練所有參數（Fine-tuning）相當的水準。
+    \begin{itemize}
+        \item \textbf{具體任務}：Google Speech Commands (SCR)、語者意圖分類 (Intent Classification)、語言辨識 (LID)、性別識別 (GID) 及語音活動偵測 (VAD)。
+        \item \textbf{意涵}：這證明了 SpeechPrompt 是一個真實可行且高效的解決方案。它大幅降低了儲存與計算成本，卻未顯著犧牲性能，具備極高的實用價值與參數效率（Parameter Efficiency）。
+    \end{itemize}
+
+    \item \textbf{落後 SOTA (Underperform SOTA)}：
+    在涉及細微聲學特徵或非語意內容的任務上，SpeechPrompt 與專用模型仍有明顯差距。
+    \begin{itemize}
+        \item \textbf{具體任務}：\textbf{偽造語音偵測 (Fake Speech Detection / ASVspoof)}、情緒辨識 (Emotion Recognition)、口音分類 (Accent Classification)。
+        \item \textbf{關鍵數據}：特別是在本計畫關注的 \textbf{ASVspoof 2019 LA (Logical Access)} 任務上，當時SOTA 模型的等錯誤率 (EER) 可達 \textbf{2.5\%}，而 SpeechPrompt v2 最佳僅能達到 \textbf{13.5\%}。
+        \item \textbf{意涵}：這顯示出目前的 SpeechPrompt 架構在捕捉「非語意」的聲學細節（如合成語音的偽造痕跡或情緒的細微變化）時仍有局限。這可能歸因於 GSLM 前端的離散化過程（Quantization）過濾掉了部分關鍵的高頻聲學訊息，或是目前的 Prompt 機制尚未能有效引導模型關注這些特徵。
+    \end{itemize}
+\end{enumerate}
+
+
+\subsection{文獻總結與本計畫之研究定位}
+
+綜合上述對語音合成與深偽偵測發展軌跡的回顧，我們可以觀察到一項在防禦端亟待解決的矛盾點：\textbf{傳統的 SOTA 防禦模型（如 SSL-AASIST）雖具備強大的偵測性能與跨域泛化力，但其極度昂貴的計算代價與龐大的參數量（\textasciitilde 318M），在實際落地部署時面臨巨大的阻礙}。為了因應輕量化與高效部署的需求，本研究挑選了三種具備不同架構哲學與參數規模的指標性模型進行深入的橫向對比與消融分析，藉此釐清防偽偵測的關鍵瓶頸。我們的研究定位與對比策略如下表 \ref{tab:model_comparison} 所示：
+
+\begin{table}[H]
+\centering
+\caption{本研究選用之三種代表性偵測模型之核心特性比較}
+\label{tab:model_comparison}
+\begin{tabular}{llcc}
+\toprule
+\textbf{模型架構} & \textbf{訓練範式} & \textbf{特徵型態} & \textbf{可訓練參數量} \\
+\midrule
+\textbf{SSL-AASIST} & Pre-train, Full Fine-tune & 連續 (Continuous) & \textasciitilde 318M \\
+\textbf{MFA-Conformer} & Pre-train, Partial Fine-tune & 連續 (Continuous) & \textasciitilde 14M \\
+\textbf{SpeechPrompt v2} & Prompting Paradigm & 離散 (Discrete) & \textasciitilde 0.13M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{enumerate}
+    \item \textbf{SSL-AASIST 作為效能指標天花板}：作為目前公認的 SOTA 標竿，其採用全參數微調的巨型模型策略。本研究將其視為「在不考慮計算資源下，基礎模型於偽造偵測任務所能達到的泛化能力上限」，並以此作為衡量其他輕量化架構的基準線。
+    \item \textbf{MFA-Conformer 驗證中型架構的潛力}：作為中等規模（14M）的模型代表，其僅需 SSL-AASIST 不到 5\% 的參數量，卻能在語者辨識（ASV）等任務上取得優異表現。本研究將探討這種依賴局部-全域特徵（CNN+Transformer）的設計，在面對未知編碼破壞（如 ASV21 DF）時，其特徵聚合機制是否足以跨越領域鴻溝，或是受限於模型容量。
+    \item \textbf{SpeechPrompt 探索極致參數效率的邊界與侷限}：作為僅需訓練 0.13M 參數（僅佔前者 0.04\%）的前衛架構，其在許多語意理解任務上已能比肩甚至超越 SOTA，但在防偽偵測（如 ASV19 LA）上卻存在顯著的性能落差（EER 13.5\% 對比 0.21\%）。
+\end{enumerate}
+
+\textbf{本計畫之核心目標}：本研究的定位並非單純比較哪一個模型擁有最低的錯誤率，而是要\textbf{深入探討導致效能落差的底層原因}。特別是針對 SpeechPrompt 展現出的巨大效能斷層，本計畫將透過一系列消融實驗（Ablation Studies），釐清其瓶頸究竟是來自於「Prompt Tuning 機制本身的學習能力不足」，還是「前端 GSLM 離散化過程抹除了鑑別真偽所需的連續聲學微小瑕疵」。唯有釐清導致泛化失敗與效能天花板的根本機制，未來才能在「極致參數效率（Prompting）」與「穩健泛化性能」之間，找出一條兩全其美的防禦架構演進指引。
